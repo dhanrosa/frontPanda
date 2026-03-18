@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "PhoneModel": {
+      "title": "Phone Model",
+      "description": "A mobile phone model available for mockup preview.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the model (e.g., iPhone 15 Pro)" },
+        "brand": { "type": "string", "description": "The brand of the phone (e.g., Apple)" },
+        "imageUrl": { "type": "string", "description": "Base image of the phone body" },
+        "cameraLayout": { "type": "string", "description": "The layout type for the camera module" },
+        "color": { "type": "string", "description": "The hex color code for the phone body" },
+        "hasLogo": { "type": "boolean", "description": "Whether the phone has a brand logo on the back" },
+        "maskConfig": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" },
+            "borderRadius": { "type": "number" },
+            "shape": { "type": "string", "enum": ["rectangle", "circle"] }
+          }
+        }
+      },
+      "required": ["name", "brand", "imageUrl"]
+    },
+    "Brand": {
+      "title": "Brand",
+      "description": "Phone manufacturer brand",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "ThemeImage": {
+      "title": "Theme Image",
+      "description": "A pre-defined image available for users to pick as a theme.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the theme" },
+        "category": { "type": "string", "description": "Category (e.g., Nature, Abstract)" },
+        "imageUrl": { "type": "string", "description": "The URL of the image" }
+      },
+      "required": ["title", "imageUrl"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and roles.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/phoneModels/{modelId}": {
+      "schema": "PhoneModel",
+      "description": "Collection of available phone models."
+    },
+    "/themes/{themeId}": {
+      "schema": "ThemeImage",
+      "description": "Collection of pre-defined theme images."
+    },
+    "/brands/{brandId}": {
+      "schema": "Brand",
+      "description": "Collection of phone brands."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and permissions."
+    }
+  }
+}

@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: phoneModels
+    // Fields: name, brand, cameraLayout, color, hasLogo
+    //
+    // Collection: themes
+    // Fields: title, category, imageUrl
+    //
+    // Collection: users
+    // Fields: email, role
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "drapha.com@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidPhoneModel(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.brand is string && data.brand.size() > 0 &&
+             (!('imageUrl' in data) || data.imageUrl is string) &&
+             (!('cameraLayout' in data) || data.cameraLayout is string) &&
+             (!('color' in data) || data.color is string) &&
+             (!('maskConfig' in data) || (
+               data.maskConfig is map &&
+               data.maskConfig.x is number &&
+               data.maskConfig.y is number &&
+               data.maskConfig.width is number &&
+               data.maskConfig.height is number &&
+               data.maskConfig.borderRadius is number &&
+               data.maskConfig.shape in ['rectangle', 'circle']
+             ));
+    }
+
+    function isValidTheme(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.imageUrl is string && data.imageUrl.size() > 0;
+    }
+
+    function isValidBrand(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             (!('logoUrl' in data) || data.logoUrl is string);
+    }
+
+    // Rules
+    match /phoneModels/{modelId} {
+      allow read, write: if true;
+    }
+
+    match /themes/{themeId} {
+      allow read, write: if true;
+    }
+
+    match /brands/{brandId} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+  }
+}

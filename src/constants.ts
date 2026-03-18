@@ -2,12 +2,26 @@ export interface PhoneModel {
   id: string;
   name: string;
   brand: string;
+  imageUrl?: string;
   cameraLayout: 'single-top-left' | 'dual-vertical-left' | 'triple-square-left' | 'dual-diagonal-left' | 'vertical-strip-left' | 'centered-circle' | 'quad-square-center' | 'iphone-11';
   color: string;
   hasLogo?: boolean;
+  col1?: string;
+  col2?: string;
+  col3?: string;
+  maskConfig?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    borderRadius: number;
+    shape: 'rectangle' | 'circle';
+    cameraX?: number;
+    cameraY?: number;
+    cameraWidth?: number;
+    cameraHeight?: number;
+  };
 }
-
-export const BRANDS = ['Apple', 'Samsung', 'Motorola', 'Xiaomi'];
 
 export const PHONE_MODELS: PhoneModel[] = [
   // Apple
