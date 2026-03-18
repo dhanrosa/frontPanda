@@ -785,6 +785,7 @@ export default function App() {
         <div className="relative w-full h-full flex items-center justify-center">
           {/* Imagem do usuário ou fallback col2 */}
           {image || selectedModel?.col2 ? (
+            
             <motion.img
               src={image || selectedModel?.col2}
               alt="Upload / Modelo"
