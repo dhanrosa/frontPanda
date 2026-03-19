@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import '../../FRONT PAMDA/src/image.css';
+import './image.css';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   Upload,
@@ -74,7 +74,14 @@ export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [imageRatio, setImageRatio] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragLimits, setDragLimits] = useState({
+  left: 0,
+  right: 0,
+  top: 0,
+  bottom: 0,
+});
 
   const [phoneModels, setPhoneModels] = useState<PhoneModel[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
@@ -94,10 +101,11 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageAreaRef = useRef<HTMLDivElement>(null);
 
   const brands = useMemo(() => {
-    return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
-  }, [phoneModels]);
+  return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
+}, [phoneModels]);
 
   const filteredModels = useMemo(() => {
     return phoneModels.filter(
@@ -106,6 +114,15 @@ export default function App() {
         m.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [selectedBrand, searchQuery, phoneModels]);
+
+const normalizedRotation = ((imageRotation % 360) + 360) % 360;
+
+const isQuarterTurn =
+  normalizedRotation === 90 || normalizedRotation === 270;
+
+const effectiveRatio = imageRatio
+  ? (isQuarterTurn ? 1 / imageRatio : imageRatio)
+  : 1;
 
   function mapSheetRowToPhoneModel(row: any): PhoneModel | null {
     if (!row.marca || !row.modelo) return null;
@@ -119,6 +136,18 @@ export default function App() {
       hasLogo: String(row.haslogo).toLowerCase() === 'true',
     };
   }
+
+  const getDirectImageUrl = (url: string) => {
+    if (!url || typeof url !== 'string') return '';
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.includes('drive.google.com')) {
+      const idMatch = trimmedUrl.match(/\/d\/([^\/]+)/) || trimmedUrl.match(/id=([^&]+)/);
+      if (idMatch && idMatch[1]) {
+        return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+      }
+    }
+    return trimmedUrl;
+  };
 
   useEffect(() => {
     async function loadSheet() {
@@ -157,13 +186,13 @@ export default function App() {
 
           dataRows.forEach((row: any) => {
             const col1 = String(row.c?.[0]?.v ?? '').trim(); // nome
-            const col2 = String(row.c?.[1]?.v ?? '').trim(); // coluna 2
-            const col3 = String(row.c?.[2]?.v ?? '').trim(); // coluna 3
+            const col2Raw = String(row.c?.[1]?.v ?? '').trim(); // coluna 2
+            const col3Raw = String(row.c?.[2]?.v ?? '').trim(); // coluna 3
 
             if (!col1) return;
 
-            // debug opcional
-            console.log(col1, col2, col3);
+            const col2 = getDirectImageUrl(col2Raw);
+            const col3 = getDirectImageUrl(col3Raw);
 
             allModels.push({
               id: `${sheet.brand}-${col1}`.toLowerCase().replace(/\s+/g, '-'),
@@ -206,22 +235,81 @@ export default function App() {
     loadSheet();
   }, []);
   useEffect(() => {
-    if (image) {
-      setZoom(100);
-      setPosition({ x: 0, y: 0 });
+  if (!imageAreaRef.current || !image || !effectiveRatio) return;
+
+  const updateLimits = () => {
+    const areaRect = imageAreaRef.current?.getBoundingClientRect();
+    if (!areaRect) return;
+
+    const areaWidth = areaRect.width;
+    const areaHeight = areaRect.height;
+
+    let fittedWidth = 0;
+    let fittedHeight = 0;
+
+    if (effectiveRatio >= 0.95) {
+      fittedHeight = areaHeight;
+      fittedWidth = areaHeight * effectiveRatio;
+    } else {
+      fittedWidth = areaWidth;
+      fittedHeight = areaWidth / effectiveRatio;
     }
-  }, [image]);
+
+    const scaleMultiplier = (zoom / 100) * (isQuarterTurn ? 1.02 : 1);
+
+    const finalWidth = fittedWidth * scaleMultiplier;
+    const finalHeight = fittedHeight * scaleMultiplier;
+
+    const overflowX = Math.max(0, (finalWidth - areaWidth) / 2);
+    const overflowY = Math.max(0, (finalHeight - areaHeight) / 2);
+
+    setDragLimits({
+      left: -overflowX,
+      right: overflowX,
+      top: -overflowY,
+      bottom: overflowY,
+    });
+
+    setPosition((prev) => ({
+      x: Math.max(-overflowX, Math.min(overflowX, prev.x)),
+      y: Math.max(-overflowY, Math.min(overflowY, prev.y)),
+    }));
+  };
+
+  const raf = requestAnimationFrame(updateLimits);
+  window.addEventListener('resize', updateLimits);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    window.removeEventListener('resize', updateLimits);
+  };
+}, [image, zoom, effectiveRatio, isQuarterTurn, selectedModel?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImage(event.target?.result as string);
+  const file = e.target.files?.[0];
+
+  if (file) {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+
+      // 🔍 cria imagem para pegar proporção
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.width / img.height;
+        setImageRatio(ratio);
       };
-      reader.readAsDataURL(file);
-    }
-  };
+
+      img.src = imageData;
+
+      // 📸 salva imagem normalmente
+      setImage(imageData);
+    };
+
+    reader.readAsDataURL(file);
+  }
+};
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -233,17 +321,30 @@ export default function App() {
   };
 
   const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImage(event.target?.result as string);
+  e.preventDefault();
+  setIsDragging(false);
+
+  const file = e.dataTransfer.files?.[0];
+
+  if (file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.width / img.height;
+        setImageRatio(ratio);
       };
-      reader.readAsDataURL(file);
-    }
-  };
+
+      img.src = imageData;
+      setImage(imageData);
+    };
+
+    reader.readAsDataURL(file);
+  }
+};
 
   const resetTransform = () => {
     setZoom(100);
@@ -260,50 +361,25 @@ export default function App() {
   };
 
   const moveImage = (direction: 'up' | 'down' | 'left' | 'right') => {
-    if (!containerRef.current) return;
+  const step = 30;
 
-    const { width, height } = containerRef.current.getBoundingClientRect();
-    const scale = zoom / 100;
-    const maxX = (width * scale - width) / 2;
-    const maxY = (height * scale - height) / 2;
-    const stepX = width * 0.1;
-    const stepY = height * 0.1;
+  setPosition((prev) => {
+    let newX = prev.x;
+    let newY = prev.y;
 
-    setPosition((prev) => {
-      let newX = prev.x;
-      let newY = prev.y;
-
-      if (direction === 'up') newY -= stepY;
-      if (direction === 'down') newY += stepY;
-      if (direction === 'left') newX -= stepX;
-      if (direction === 'right') newX += stepX;
-
-      return {
-        x: Math.max(-maxX, Math.min(maxX, newX)),
-        y: Math.max(-maxY, Math.min(maxY, newY)),
-      };
-    });
-  };
-
-  const dragConstraints = useMemo(() => {
-    if (!containerRef.current) {
-      return { left: 0, right: 0, top: 0, bottom: 0 };
-    }
-
-    const { width, height } = containerRef.current.getBoundingClientRect();
-    const scale = zoom / 100;
-    const maxX = (width * scale - width) / 2;
-    const maxY = (height * scale - height) / 2;
+    if (direction === 'up') newY -= step;
+    if (direction === 'down') newY += step;
+    if (direction === 'left') newX -= step;
+    if (direction === 'right') newX += step;
 
     return {
-      left: -maxX,
-      right: maxX,
-      top: -maxY,
-      bottom: maxY,
+      x: Math.max(dragLimits.left, Math.min(dragLimits.right, newX)),
+      y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, newY)),
     };
-  }, [zoom, selectedModel?.id]);
+  });
+};
 
-  const handleDownload = () => {
+   const handleDownload = () => {
     if (!image) return;
     alert('Funcionalidade de exportação de mockup seria implementada aqui!');
   };
@@ -494,6 +570,157 @@ export default function App() {
             </div>
           </section>
 
+          <AnimatePresence>
+            {image && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-6 overflow-hidden"
+              >
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Ajustes da Imagem
+                    </label>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      Zoom: {zoom}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex bg-zinc-100 rounded-lg p-1">
+                        <button
+                          onClick={() => setZoom(Math.max(100, zoom - 10))}
+                          className="p-1.5 hover:bg-white rounded-md transition-colors text-zinc-600"
+                        >
+                          <ZoomOut className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setZoom(Math.min(300, zoom + 10))}
+                          className="p-1.5 hover:bg-white rounded-md transition-colors text-zinc-600"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
+                        Zoom
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-1.5">
+                      <button
+                        onClick={() => setIsMirrored(!isMirrored)}
+                        className={`p-2.5 rounded-lg transition-all ${isMirrored
+                          ? 'bg-indigo-600 text-white shadow-lg'
+                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                          }`}
+                      >
+                        <FlipHorizontal className="w-4 h-4" />
+                      </button>
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
+                        Espelhar
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-1.5">
+                      <button
+                        onClick={() => setImageRotation((prev) => (prev - 90) % 360)}
+                        className="p-2.5 rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
+                        Girar Anti
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-1.5">
+                      <button
+                        onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
+                        className="p-2.5 rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                      </button>
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
+                        Girar Hor
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <input
+                      type="range"
+                      min="100"
+                      max="300"
+                      value={zoom}
+                      onChange={(e) => setZoom(parseInt(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                </section>
+
+                <section>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3 block">
+                    Ajuste de Posição
+                  </label>
+                  <div className="flex flex-col items-center gap-1.5">
+                    <button
+                      onClick={() => moveImage('up')}
+                      className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                    >
+                      <ChevronUp className="w-5 h-5" />
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => moveImage('left')}
+                        className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <div className="w-10 h-10 rounded-lg border border-zinc-200 flex items-center justify-center">
+                        <Move className="w-4 h-4 text-zinc-300" />
+                      </div>
+                      <button
+                        onClick={() => moveImage('right')}
+                        className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => moveImage('down')}
+                      className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
+                    >
+                      <ChevronDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </section>
+
+                <div className="pt-4 flex gap-2">
+                  <button
+                    onClick={resetTransform}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Resetar
+                  </button>
+                  <button
+                    onClick={() => {
+  setImage(null);
+  setImageRatio(null);
+  setPosition({ x: 0, y: 0 });
+}}
+                    className="p-2.5 rounded-xl border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
@@ -601,152 +828,7 @@ export default function App() {
             </div>
           </section>
 
-          <AnimatePresence>
-            {image && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-6 overflow-hidden"
-              >
-                <section className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                      Ajustes da Imagem
-                    </label>
-                    <span className="text-[10px] font-mono text-zinc-500">
-                      Zoom: {zoom}%
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="flex flex-col items-center gap-1.5">
-                      <div className="flex bg-zinc-100 rounded-lg p-1">
-                        <button
-                          onClick={() => setZoom(Math.max(100, zoom - 10))}
-                          className="p-1.5 hover:bg-white rounded-md transition-colors text-zinc-600"
-                        >
-                          <ZoomOut className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setZoom(Math.min(300, zoom + 10))}
-                          className="p-1.5 hover:bg-white rounded-md transition-colors text-zinc-600"
-                        >
-                          <ZoomIn className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
-                        Zoom
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1.5">
-                      <button
-                        onClick={() => setIsMirrored(!isMirrored)}
-                        className={`p-2.5 rounded-lg transition-all ${isMirrored
-                          ? 'bg-indigo-600 text-white shadow-lg'
-                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                          }`}
-                      >
-                        <FlipHorizontal className="w-4 h-4" />
-                      </button>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
-                        Espelhar
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1.5">
-                      <button
-                        onClick={() => setImageRotation((prev) => (prev - 90) % 360)}
-                        className="p-2.5 rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
-                        Girar Anti
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-1.5">
-                      <button
-                        onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
-                        className="p-2.5 rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all"
-                      >
-                        <RotateCw className="w-4 h-4" />
-                      </button>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase">
-                        Girar Hor
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <input
-                      type="range"
-                      min="100"
-                      max="300"
-                      value={zoom}
-                      onChange={(e) => setZoom(parseInt(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                </section>
-
-                <section>
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3 block">
-                    Ajuste de Posição
-                  </label>
-                  <div className="flex flex-col items-center gap-2">
-                    <button
-                      onClick={() => moveImage('up')}
-                      className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-                    >
-                      <ChevronUp className="w-5 h-5" />
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => moveImage('left')}
-                        className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <div className="w-10 h-10 rounded-lg border border-zinc-200 flex items-center justify-center">
-                        <Move className="w-4 h-4 text-zinc-300" />
-                      </div>
-                      <button
-                        onClick={() => moveImage('right')}
-                        className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => moveImage('down')}
-                      className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-                    >
-                      <ChevronDown className="w-5 h-5" />
-                    </button>
-                  </div>
-                </section>
-
-                <div className="pt-4 flex gap-2">
-                  <button
-                    onClick={resetTransform}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Resetar
-                  </button>
-                  <button
-                    onClick={() => setImage(null)}
-                    className="p-2.5 rounded-xl border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          
         </div>
 
         <div className="mt-auto p-6 border-t border-zinc-100 bg-zinc-50/50">
@@ -782,49 +864,90 @@ export default function App() {
           // layout
           // className="relative w-[340px] h-[680px] rounded-[3.5rem] p-1.5 bg-zinc-300 shadow-2xl overflow-visible"
           >
-        <div className="relative w-full h-full flex items-center justify-center">
-          {/* Imagem do usuário ou fallback col2 */}
-          {image || selectedModel?.col2 ? (
-            
-            <motion.img
-              src={image || selectedModel?.col2}
-              alt="Upload / Modelo"
-              drag
-              dragConstraints={dragConstraints}
-              dragElastic={0}
-              dragMomentum={false}
-              animate={{
-                scale: (zoom / 100) * (imageRotation % 180 !== 0 ? 2 : 1),
-                rotate: imageRotation,
-                x: position.x,
-                y: position.y,
-              }}
-              onDrag={(_, info) =>
-                setPosition((prev) => ({
-                  x: prev.x + info.delta.x,
-                  y: prev.y + info.delta.y,
+        <div
+  ref={containerRef}
+  className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center"
+>
+  {/* BASE (col2) - SEMPRE visível */}
+{selectedModel?.col2 && (
+  <img
+    src={selectedModel.col2}
+    className="absolute top-0 left-0 w-full h-full object-fill"
+  />
+)}
 
-                }))
-              }
-              className="max-w-full max-h-full cursor-move object-contain"
-            />
-          ) : null}
+{/* IMAGEM DO USUÁRIO */}
+{image && (
+  <div
+    ref={imageAreaRef}
+    className="absolute overflow-hidden"
+    style={{
+      top: '3.5%',
+      bottom: '3.5%',
+      left: '8%',
+      right: '8%',
+    }}
+  >
+    <motion.div
+  drag
+  dragConstraints={dragLimits}
+  dragElastic={0}
+  dragMomentum={false}
+  animate={{
+  x: position.x,
+  y: position.y,
+  scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
+  rotate: imageRotation,
+}}
+  transition={{
+    type: 'spring',
+    stiffness: 300,
+    damping: 30,
+  }}
+  onDragEnd={(_, info) => {
+    setPosition((prev) => {
+      const nextX = prev.x + info.offset.x;
+      const nextY = prev.y + info.offset.y;
 
-          {/* Overlay transparente da col3 mantendo proporção */}
-          {selectedModel?.col3 && (
-            <img
-              src={selectedModel.col3}
-              alt="Overlay col3"
-              className="absolute top-1/2 left-1/2 pointer-events-none"
-              style={{
-                transform: 'translate(-50%, -50%)', // centraliza
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain', // mantém proporção
-              }}
-            />
-          )}
-        </div>
+      return {
+        x: Math.max(dragLimits.left, Math.min(dragLimits.right, nextX)),
+        y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, nextY)),
+      };
+    });
+  }}
+  style={{
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }}
+>
+  <img
+  src={image}
+  draggable={false}
+    style={{
+      transform: isMirrored ? 'scaleX(-1)' : 'scaleX(1)',
+    }}
+    className={`pointer-events-none select-none ${
+  effectiveRatio && effectiveRatio >= 0.95
+    ? 'h-full w-auto'
+    : 'w-full h-auto'
+} max-w-none max-h-none`}
+  />
+</motion.div>
+  </div>
+)}
+
+
+  {/* MÁSCARA */}
+  {selectedModel?.col3 && (
+    <img
+      src={selectedModel.col3}
+      className="absolute inset-0 w-full h-full pointer-events-none"
+    />
+  )}
+</div>
 
           </motion.div>
           {/* <div className="absolute -top-1 -left-1 w-16 h-16 bg-white/20 blur-[1px] rounded-tl-[3.5rem] z-50 pointer-events-none border-t-4 border-l-4 border-white/40" />
