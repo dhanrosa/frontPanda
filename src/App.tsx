@@ -465,10 +465,10 @@ const effectiveRatio = imageRatio
         <div className="p-8 border-b border-zinc-100/50 text-center">
           <div className="mb-4">
             <img
-              src="/logopamda.png"
-              alt="Logo Pamda Cases"
-              className="w-48 h-auto mx-auto"
-            />
+  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+  alt="Logo Pamda Cases"
+  className="w-48 h-auto mx-auto"
+/>
           </div>
           <h2 className="font-lexend font-bold text-zinc-800 text-lg">
             Sua capinha, do seu jeito!
