@@ -22,6 +22,9 @@ import {
   Type,
   FlipHorizontal,
   RotateCw,
+  Bold,
+  Italic,
+  Underline,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { PhoneModel } from './constants';
@@ -767,33 +770,33 @@ const effectiveRatio = imageRatio
   <button
     type="button"
     onClick={() => setIsBold(!isBold)}
-    className={`px-2 py-1 rounded text-sm ${
-      isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    className={`p-2 rounded ${
+      isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
     }`}
   >
-    Neg
+    <Bold className="w-4 h-4" />
   </button>
 
   {/* ITALICO */}
   <button
     type="button"
     onClick={() => setIsItalic(!isItalic)}
-    className={`px-2 py-1 rounded text-sm ${
-      isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    className={`p-2 rounded ${
+      isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
     }`}
   >
-    Itá
+    <Italic className="w-4 h-4" />
   </button>
 
   {/* SUBLINHADO */}
   <button
     type="button"
     onClick={() => setIsUnderline(!isUnderline)}
-    className={`px-1.5 py-1 rounded text-sm ${
-      isUnderline ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    className={`p-2 rounded ${
+      isUnderline ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
     }`}
   >
-    Sub
+    <Underline className="w-4 h-4" />
   </button>
 
   {/* DIVISOR */}
@@ -806,7 +809,7 @@ const effectiveRatio = imageRatio
     <button
       type="button"
       onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
-      className="px-2 py-1 bg-zinc-100 rounded text-xs"
+      className="px-3 py-1 bg-zinc-100 rounded text-xs"
     >
       -
     </button>
@@ -816,7 +819,7 @@ const effectiveRatio = imageRatio
     <button
       type="button"
       onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
-      className="px-2 py-1 bg-zinc-100 rounded text-xs"
+      className="px-3 py-1 bg-zinc-100 rounded text-xs"
     >
       +
     </button>
@@ -931,7 +934,7 @@ const effectiveRatio = imageRatio
       {/* CONTROLE */}
       <div className="flex-1">
         <p className="text-xs font-semibold text-zinc-600">
-          Espessura da borda
+          Cor e espessura da borda
         </p>
 
         <div className="mt-1 flex items-center gap-2">
