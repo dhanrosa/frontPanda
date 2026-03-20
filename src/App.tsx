@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { PhoneModel } from './constants';
 
 const GOOGLE_FONTS = [
+  { name: 'Lexend', value: "'Lexend', sans-serif" },
   { name: 'Arial', value: 'sans-serif' },
   { name: 'Roboto', value: "'Roboto', sans-serif" },
   { name: 'Open Sans', value: "'Open Sans', sans-serif" },
@@ -764,7 +765,7 @@ const effectiveRatio = imageRatio
               <div className="relative">
                 <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400" />
                 <textarea
-                  placeholder="Escreva sua frase..."
+                  placeholder="Escreva seu texto..."
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
                   rows={3}
@@ -795,18 +796,34 @@ const effectiveRatio = imageRatio
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase">
-                    Tamanho
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={textSize}
-                      onChange={(e) => setTextSize(parseInt(e.target.value) || 12)}
-                      className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
+  <label className="text-[10px] font-bold text-zinc-400 uppercase">
+    Tamanho
+  </label>
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={() => setTextSize((prev) => Math.max(8, prev - 2))}
+      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+    >
+      -
+    </button>
+
+    <input
+      type="number"
+      value={textSize}
+      onChange={(e) => setTextSize(Math.max(8, parseInt(e.target.value) || 12))}
+      className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
+    />
+
+    <button
+      type="button"
+      onClick={() => setTextSize((prev) => Math.min(200, prev + 2))}
+      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+    >
+      +
+    </button>
+  </div>
+</div>
               </div>
 
               <div className="space-y-1">
@@ -877,7 +894,7 @@ const effectiveRatio = imageRatio
 )}
 
 {/* IMAGEM DO USUÁRIO */}
-{image && (
+{!textOnlyMode && image && (
   <div
     ref={imageAreaRef}
     className="absolute overflow-hidden"
@@ -939,7 +956,88 @@ const effectiveRatio = imageRatio
   </div>
 )}
 
+{customText && (
+  <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+    <motion.div
+      drag
+      dragElastic={0}
+      dragMomentum={false}
+      style={{
+        x: textPosition.x,
+        y: textPosition.y,
+        rotate: textRotation,
+        pointerEvents: 'auto',
+        cursor: 'move',
+      }}
+      onDragEnd={(_, info) => {
+        setTextPosition((prev) => ({
+          x: prev.x + info.offset.x,
+          y: prev.y + info.offset.y,
+        }));
+      }}
+      className="relative max-w-[75%] select-none"
+    >
+      <div className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent">
+        <div
+          style={{
+            fontFamily: textFont,
+            color: textColor,
+            fontSize: `${textSize}px`,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            textAlign: 'center',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            textShadow: '0 2px 4px rgba(0,0,0,0.18)',
+          }}
+        >
+          {customText}
+        </div>
 
+<div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setTextRotation((prev) => (prev - 45) % 360);
+    }}
+    className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
+    title="Girar Anti-horário"
+  >
+    <RotateCcw className="w-3.5 h-3.5" />
+  </button>
+
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setTextRotation((prev) => (prev + 45) % 360);
+    }}
+    className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
+    title="Girar Horário"
+  >
+    <RotateCw className="w-3.5 h-3.5" />
+  </button>
+</div>
+
+        <motion.div
+          drag
+          dragElastic={0}
+          dragMomentum={false}
+          onDrag={(_, info) => {
+            const delta = info.delta.x + info.delta.y;
+            setTextSize((prev) =>
+              Math.max(8, Math.min(200, prev + delta * 0.25))
+            );
+          }}
+          className="absolute -bottom-2 -right-2 w-4 h-4 bg-green-600 border border-white rounded-sm cursor-nwse-resize"
+        />
+
+        <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-green-600" />
+        <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-green-600" />
+        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-green-600" />
+      </div>
+    </motion.div>
+  </div>
+)}
   {/* MÁSCARA */}
   {selectedModel?.col3 && (
     <img
