@@ -94,11 +94,18 @@ export default function App() {
 
   const [customText, setCustomText] = useState('');
   const [textColor, setTextColor] = useState('#000000');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [textFont, setTextFont] = useState(GOOGLE_FONTS[0].value);
   const [textSize, setTextSize] = useState(24);
+  const [letterSpacing, setLetterSpacing] = useState(0);
   const [textPosition, setTextPosition] = useState({ x: 0, y: 0 });
   const [textRotation, setTextRotation] = useState(0);
   const [imageRotation, setImageRotation] = useState(0);
+  const [isBold, setIsBold] = useState(false);
+const [isItalic, setIsItalic] = useState(false);
+const [isUnderline, setIsUnderline] = useState(false);
+const [textStroke, setTextStroke] = useState(0);
+const [textStrokeColor, setTextStrokeColor] = useState('#000000');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -763,15 +770,78 @@ const effectiveRatio = imageRatio
               </div>
 
               <div className="relative">
-                <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400" />
-                <textarea
-                  placeholder="Escreva seu texto..."
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  rows={3}
-                  className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
-                />
-              </div>
+  <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400" />
+  <textarea
+    placeholder="Escreva seu texto..."
+    value={customText}
+    onChange={(e) => setCustomText(e.target.value)}
+    rows={3}
+    className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
+  />
+</div>
+
+<div className="flex items-center gap-2 mt-2">
+  {/* BOLD */}
+  <button
+    type="button"
+    onClick={() => setIsBold(!isBold)}
+    className={`px-2 py-1 rounded text-sm ${
+      isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    }`}
+  >
+    Neg
+  </button>
+
+  {/* ITALICO */}
+  <button
+    type="button"
+    onClick={() => setIsItalic(!isItalic)}
+    className={`px-2 py-1 rounded text-sm ${
+      isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    }`}
+  >
+    Itá
+  </button>
+
+  {/* SUBLINHADO */}
+  <button
+    type="button"
+    onClick={() => setIsUnderline(!isUnderline)}
+    className={`px-1.5 py-1 rounded text-sm ${
+      isUnderline ? 'bg-indigo-600 text-white' : 'bg-zinc-100'
+    }`}
+  >
+    Sub
+  </button>
+
+  {/* DIVISOR */}
+  <div className="w-px h-3 bg-zinc-300 mx-1" />
+
+  {/* ESPAÇAMENTO */}
+  <div className="flex items-center gap-1">
+    <span className="text-xs text-zinc-800">Espaçamento</span>
+
+    <button
+      type="button"
+      onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
+      className="px-2 py-1 bg-zinc-100 rounded text-xs"
+    >
+      -
+    </button>
+
+    <span className="text-xs w-8 text-center">{letterSpacing}</span>
+
+    <button
+      type="button"
+      onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
+      className="px-2 py-1 bg-zinc-100 rounded text-xs"
+    >
+      +
+    </button>
+  </div>
+</div>
+
+
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
@@ -823,6 +893,7 @@ const effectiveRatio = imageRatio
       +
     </button>
   </div>
+  
 </div>
               </div>
 
@@ -841,6 +912,38 @@ const effectiveRatio = imageRatio
                     />
                   ))}
                 </div>
+                <div className="flex items-center gap-2 mt-3">
+  <input
+    type="color"
+    value={textColor}
+    onChange={(e) => setTextColor(e.target.value)}
+    className="w-10 h-10 p-1 border border-zinc-200 rounded cursor-pointer"
+  />
+  <span className="text-xs text-zinc-500">Cor Personalizada</span>
+</div>
+<div className="space-y-1 mt-3">
+  <label className="text-[10px] font-bold text-zinc-400 uppercase">
+    Borda
+  </label>
+
+  <div className="flex items-center gap-2">
+    <input
+      type="range"
+      min="0"
+      max="5"
+      value={textStroke}
+      onChange={(e) => setTextStroke(parseInt(e.target.value))}
+      className="w-full"
+    />
+
+    <input
+      type="color"
+      value={textStrokeColor}
+      onChange={(e) => setTextStrokeColor(e.target.value)}
+      className="w-8 h-8"
+    />
+  </div>
+</div>
               </div>
             </div>
           </section>
@@ -980,16 +1083,32 @@ const effectiveRatio = imageRatio
       <div className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent">
         <div
           style={{
-            fontFamily: textFont,
-            color: textColor,
-            fontSize: `${textSize}px`,
-            fontWeight: 700,
-            lineHeight: 1.2,
-            textAlign: 'center',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            textShadow: '0 2px 4px rgba(0,0,0,0.18)',
-          }}
+  fontFamily: textFont,
+  color: textColor,
+  fontSize: `${textSize}px`,
+  letterSpacing: `${letterSpacing}px`,
+  fontWeight: isBold ? 700 : 400,
+  fontStyle: isItalic ? 'italic' : 'normal',
+  textDecoration: isUnderline ? 'underline' : 'none',
+ textShadow:
+  textStroke > 0
+    ? `
+      ${textStroke}px 0 ${textStrokeColor},
+      -${textStroke}px 0 ${textStrokeColor},
+      0 ${textStroke}px ${textStrokeColor},
+      0 -${textStroke}px ${textStrokeColor},
+      ${textStroke}px ${textStroke}px ${textStrokeColor},
+      -${textStroke}px -${textStroke}px ${textStrokeColor},
+      ${textStroke}px -${textStroke}px ${textStrokeColor},
+      -${textStroke}px ${textStroke}px ${textStrokeColor}
+    `
+    : '0 2px 4px rgba(0,0,0,0.18)',
+  
+  lineHeight: 1.2,
+  textAlign: 'center',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+}}
         >
           {customText}
         </div>
