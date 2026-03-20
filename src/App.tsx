@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+import html2canvas from 'html2canvas-pro';
 import './image.css';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
@@ -58,7 +59,6 @@ const GOOGLE_FONTS = [
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(100);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [imageRatio, setImageRatio] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -68,7 +68,9 @@ export default function App() {
   top: 0,
   bottom: 0,
 });
-
+  
+const [isUploadingOrder, setIsUploadingOrder] = useState(false);
+  const [zoom, setZoom] = useState(100);
   const [phoneModels, setPhoneModels] = useState<PhoneModel[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<PhoneModel | null>(null);
@@ -95,7 +97,9 @@ const [textStrokeColor, setTextStrokeColor] = useState('#000000');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
-
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
+  const [quantity, setQuantity] = useState(1);
+const [orderCompleted, setOrderCompleted] = useState(false);
   const brands = useMemo(() => {
   return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
 }, [phoneModels]);
@@ -278,16 +282,17 @@ const effectiveRatio = imageRatio
   };
 }, [image, zoom, effectiveRatio, isQuarterTurn, selectedModel?.id]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
 
   if (file) {
+    setOriginalFile(file);
+
     const reader = new FileReader();
 
     reader.onload = (event) => {
       const imageData = event.target?.result as string;
 
-      // 🔍 cria imagem para pegar proporção
       const img = new Image();
       img.onload = () => {
         const ratio = img.width / img.height;
@@ -295,8 +300,6 @@ const effectiveRatio = imageRatio
       };
 
       img.src = imageData;
-
-      // 📸 salva imagem normalmente
       setImage(imageData);
     };
 
@@ -320,6 +323,8 @@ const effectiveRatio = imageRatio
   const file = e.dataTransfer.files?.[0];
 
   if (file && file.type.startsWith('image/')) {
+    setOriginalFile(file);
+
     const reader = new FileReader();
 
     reader.onload = (event) => {
@@ -372,10 +377,199 @@ const effectiveRatio = imageRatio
   });
 };
 
-   const handleDownload = () => {
-    if (!image) return;
-    alert('Funcionalidade de exportação de mockup seria implementada aqui!');
+const generatePreviewBlob = async (): Promise<Blob> => {
+  if (!containerRef.current) {
+    throw new Error('Área de prévia não encontrada.');
+  }
+
+  const canvas = await html2canvas(containerRef.current, {
+    backgroundColor: null,
+    useCORS: true,
+    scale: 2,
+    onclone: (clonedDoc) => {
+      const clonedContainer = clonedDoc.querySelector('[data-preview-root="true"]') as HTMLElement | null;
+
+      if (!clonedContainer) return;
+
+      const allElements = clonedContainer.querySelectorAll<HTMLElement>('*');
+
+      allElements.forEach((el) => {
+        const style = clonedDoc.defaultView?.getComputedStyle(el);
+        if (!style) return;
+
+        const safeColor = (value: string) => {
+          if (!value || value === 'transparent') return value;
+
+          if (value.includes('oklch(')) {
+            if (
+              value.includes('1 ') ||
+              value.includes('0.98') ||
+              value.includes('0.97') ||
+              value.includes('0.95')
+            ) {
+              return '#ffffff';
+            }
+
+            if (
+              value.includes('0 ') ||
+              value.includes('0.14') ||
+              value.includes('0.21') ||
+              value.includes('0.27') ||
+              value.includes('0.37')
+            ) {
+              return '#18181b';
+            }
+
+            return '#d4d4d8';
+          }
+
+          return value;
+        };
+
+        el.style.backgroundColor = safeColor(style.backgroundColor);
+        el.style.color = safeColor(style.color);
+        el.style.borderColor = safeColor(style.borderColor);
+        el.style.outlineColor = safeColor(style.outlineColor);
+        el.style.boxShadow = style.boxShadow.includes('oklch') ? 'none' : style.boxShadow;
+        el.style.textShadow = style.textShadow.includes('oklch') ? 'none' : style.textShadow;
+      });
+    },
+  });
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Não foi possível gerar a prévia.'));
+        return;
+      }
+      resolve(blob);
+    }, 'image/png');
+  });
+};
+
+const CLOUDINARY_CLOUD_NAME = 'dwexdk5pp';
+const CLOUDINARY_UPLOAD_PRESET = 'pamda_unsigned';
+
+const uploadToCloudinary = async (
+  file: File | Blob,
+  folder: string,
+  fileName?: string
+) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('folder', folder);
+
+  if (fileName) {
+    formData.append('public_id', fileName);
+  }
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error('Erro Cloudinary:', data);
+    throw new Error(data?.error?.message || 'Erro ao enviar imagem para o Cloudinary.');
+  }
+
+  return data.secure_url as string;
+};
+
+
+const uploadOrderAssets = async () => {
+  let originalImageUrl = '';
+  let previewImageUrl = '';
+
+  if (originalFile) {
+    originalImageUrl = await uploadToCloudinary(
+      originalFile,
+      'pamda-pedidos/original',
+      `original-${Date.now()}`
+    );
+  }
+
+  const previewBlob = await generatePreviewBlob();
+
+  previewImageUrl = await uploadToCloudinary(
+    previewBlob,
+    'pamda-pedidos/preview',
+    `preview-${Date.now()}`
+  );
+
+  return {
+    originalImageUrl,
+    previewImageUrl,
   };
+};
+
+  const unitPrice = 54.90;
+  const totalPrice = unitPrice * quantity;
+
+ const handleFinish = async () => {
+  try {
+    if (!selectedModel) {
+      alert('Selecione o modelo do celular.');
+      return;
+    }
+
+    if (!image && !customText.trim()) {
+      alert('Envie uma imagem ou adicione um texto para personalizar.');
+      return;
+    }
+
+    setIsUploadingOrder(true);
+
+    const { originalImageUrl, previewImageUrl } = await uploadOrderAssets();
+
+    const message = `
+*Novo pedido - Pamda Cases*
+Modelo: ${selectedModel.name}
+Marca: ${selectedBrand}
+Texto personalizado: ${customText.trim() || 'Sem texto'}
+Fonte: ${textFont}
+Tamanho do texto: ${textSize}px
+Cor do texto: ${textColor}
+Negrito: ${isBold ? 'Sim' : 'Não'}
+Itálico: ${isItalic ? 'Sim' : 'Não'}
+Sublinhado: ${isUnderline ? 'Sim' : 'Não'}
+Espaçamento: ${letterSpacing}px
+Borda do texto: ${textStroke}px
+Cor da borda: ${textStrokeColor}
+Rotação do texto: ${textRotation}°
+Rotação da imagem: ${imageRotation}°
+Espelhado: ${isMirrored ? 'Sim' : 'Não'}
+Modo somente texto: ${textOnlyMode ? 'Sim' : 'Não'}
+Quantidade: ${quantity}
+Valor unitário: R$ ${unitPrice.toFixed(2)}
+Valor total: R$ ${totalPrice.toFixed(2)}
+
+Imagem original:
+${originalImageUrl || 'Não enviada'}
+
+Prévia final:
+${previewImageUrl}
+    `;
+
+    const whatsappUrl = `https://wa.me/5541999999999?text=${encodeURIComponent(message)}`;
+
+    setOrderCompleted(true);
+    window.open(whatsappUrl, '_blank');
+  } catch (error) {
+  console.error(error);
+  const errorMessage =
+    error instanceof Error ? error.message : 'Não foi possível finalizar o pedido.';
+  alert(errorMessage);
+} finally {
+    setIsUploadingOrder(false);
+  }
+};
 
   const CameraModule = ({ layout }: { layout: PhoneModel['cameraLayout'] }) => {
     switch (layout) {
@@ -702,6 +896,7 @@ const effectiveRatio = imageRatio
                   <button
                     onClick={() => {
   setImage(null);
+  setOriginalFile(null);
   setImageRatio(null);
   setPosition({ x: 0, y: 0 });
 }}
@@ -965,22 +1160,86 @@ const effectiveRatio = imageRatio
           
         </div>
 
-        <div className="mt-auto p-6 border-t border-zinc-100 bg-zinc-50/50">
-          <button
-            disabled={!image}
-            onClick={handleDownload}
-            className={`
-              w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-all
-              ${image
-                ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl scale-[1.02] active:scale-100'
-                : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-              }
-            `}
-          >
-            <Download className="w-5 h-5" />
-            Finalizar Pedido
-          </button>
+        <div className="mt-auto p-6 border-t border-zinc-100 bg-zinc-50/50 space-y-4">
+  <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <h3 className="text-sm font-bold text-zinc-800 mb-3">Resumo do pedido</h3>
+
+    <div className="space-y-2 text-sm text-zinc-600">
+      <p>
+        <strong>Modelo:</strong> {selectedModel?.name || 'Não selecionado'}
+      </p>
+      <p>
+        <strong>Marca:</strong> {selectedBrand || 'Não selecionada'}
+      </p>
+      <p>
+        <strong>Texto:</strong> {customText.trim() || 'Sem texto'}
+      </p>
+      <p>
+        <strong>Imagem:</strong> {image ? 'Adicionada' : 'Não adicionada'}
+      </p>
+    </div>
+
+    <div className="mt-4">
+      <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-2">
+        Quantidade
+      </label>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+          className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
+        >
+          -
+        </button>
+
+        <div className="flex-1 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-sm font-bold text-zinc-800">
+          {quantity}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setQuantity((prev) => prev + 1)}
+          className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <div className="mt-4 pt-4 border-t border-zinc-100 space-y-1 text-sm">
+      <p className="flex justify-between text-zinc-600">
+        <span>Valor unitário</span>
+        <strong>R$ {unitPrice.toFixed(2)}</strong>
+      </p>
+      <p className="flex justify-between text-zinc-800 text-base font-bold">
+        <span>Total</span>
+        <span>R$ {totalPrice.toFixed(2)}</span>
+      </p>
+    </div>
+  </div>
+
+  <button
+    onClick={handleFinish}
+   disabled={isUploadingOrder || !selectedModel || (!image && !customText.trim())}
+    className={`
+      w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-all
+      ${selectedModel && (image || customText.trim())
+        ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl scale-[1.02] active:scale-100'
+        : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+      }
+    `}
+  >
+    <Download className="w-5 h-5" />
+{isUploadingOrder ? 'Enviando imagens...' : 'Finalizar Pedido'}
+  </button>
+
+  {orderCompleted && (
+    <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm font-medium text-green-700 text-center">
+      Pedido pronto para envio no WhatsApp!
+    </div>
+  )}
+</div>
       </aside>
 
       <main className="flex-1 relative flex items-center justify-center p-8 lg:p-12 overflow-hidden bg-zinc-100">
@@ -1000,14 +1259,16 @@ const effectiveRatio = imageRatio
           >
         <div
   ref={containerRef}
+  data-preview-root="true"
   className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center rounded-[60px]"
 >
   {/* BASE (col2) - SEMPRE visível */}
 {selectedModel?.col2 && (
   <img
-    src={selectedModel.col2}
-    className="absolute top-0 left-0 w-full h-full object-fill"
-  />
+  src={selectedModel.col2}
+  crossOrigin="anonymous"
+  className="absolute top-0 left-0 w-full h-full object-fill"
+/>
 )}
 
 {/* IMAGEM DO USUÁRIO */}
@@ -1174,13 +1435,15 @@ const effectiveRatio = imageRatio
   {/* MÁSCARA */}
   {selectedModel?.col3 && (
     <img
-      src={selectedModel.col3}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-    />
+  src={selectedModel.col3}
+  crossOrigin="anonymous"
+  className="absolute inset-0 w-full h-full pointer-events-none"
+/>
   )}
   {/* LOGO PAMDA */}
 <img
   src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+  crossOrigin="anonymous"
   alt="Pamda"
   className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
 />
