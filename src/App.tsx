@@ -1182,7 +1182,7 @@ const effectiveRatio = imageRatio
 <img
   src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
   alt="Pamda"
-  className="absolute top-12 right-22 w-18 opacity-90 z-50 pointer-events-none"
+  className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
 />
 </div>
 
