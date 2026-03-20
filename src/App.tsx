@@ -53,25 +53,6 @@ const GOOGLE_FONTS = [
   { name: 'Cookie', value: "'Cookie', cursive" },
 ];
 
-const SHEETS_COLORS = [
-  '#000000',
-  '#ffffff',
-  '#4285f4',
-  '#34a853',
-  '#fbbc05',
-  '#ea4335',
-  '#673ab7',
-  '#3f51b5',
-  '#00bcd4',
-  '#009688',
-  '#ff5722',
-  '#795548',
-  '#9e9e9e',
-  '#607d8b',
-  '#e91e63',
-  '#9c27b0',
-];
-
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
@@ -899,50 +880,79 @@ const effectiveRatio = imageRatio
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase">
-                  Cor
-                </label>
-                <div className="grid grid-cols-8 gap-1.5">
-                  {SHEETS_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setTextColor(color)}
-                      className={`w-6 h-6 rounded-full border border-zinc-200 transition-transform hover:scale-110 ${textColor === color ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                        }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 mt-3">
-  <input
-    type="color"
-    value={textColor}
-    onChange={(e) => setTextColor(e.target.value)}
-    className="w-10 h-10 p-1 border border-zinc-200 rounded cursor-pointer"
-  />
-  <span className="text-xs text-zinc-500">Cor Personalizada</span>
-</div>
-<div className="space-y-1 mt-3">
   <label className="text-[10px] font-bold text-zinc-400 uppercase">
-    Borda
+    Cor
   </label>
 
-  <div className="flex items-center gap-2">
-    <input
-      type="range"
-      min="0"
-      max="5"
-      value={textStroke}
-      onChange={(e) => setTextStroke(parseInt(e.target.value))}
-      className="w-full"
-    />
+  <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={textColor}
+        onChange={(e) => setTextColor(e.target.value)}
+        className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+        title="Escolher cor do texto"
+      />
 
-    <input
-      type="color"
-      value={textStrokeColor}
-      onChange={(e) => setTextStrokeColor(e.target.value)}
-      className="w-8 h-8"
-    />
+      <div className="flex-1">
+        <p className="text-xs font-semibold text-zinc-600">Cor do texto</p>
+        <div className="mt-1 flex items-center gap-2">
+          <div
+            className="h-5 w-5 rounded-full border border-zinc-300"
+            style={{ backgroundColor: textColor }}
+          />
+          <input
+            type="text"
+            value={textColor}
+            onChange={(e) => setTextColor(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+<div className="space-y-1 mt-3">
+  <label className="text-[10px] font-bold text-zinc-400 uppercase">
+    
+  </label>
+
+  <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+    <div className="flex items-center gap-3">
+      
+      {/* COR DA BORDA */}
+      <input
+        type="color"
+        value={textStrokeColor}
+        onChange={(e) => setTextStrokeColor(e.target.value)}
+        className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+        title="Cor da borda"
+      />
+
+      {/* CONTROLE */}
+      <div className="flex-1">
+        <p className="text-xs font-semibold text-zinc-600">
+          Espessura da borda
+        </p>
+
+        <div className="mt-1 flex items-center gap-2">
+          
+          {/* SLIDER */}
+          <input
+            type="range"
+            min="0"
+            max="8"
+            value={textStroke}
+            onChange={(e) => setTextStroke(parseInt(e.target.value))}
+            className="w-full"
+          />
+
+          {/* VALOR */}
+          <span className="text-xs w-8 text-center text-zinc-600">
+            {textStroke}px
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
               </div>
