@@ -1178,6 +1178,12 @@ const effectiveRatio = imageRatio
       className="absolute inset-0 w-full h-full pointer-events-none"
     />
   )}
+  {/* LOGO PAMDA */}
+<img
+  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+  alt="Pamda"
+  className="absolute top-12 right-22 w-18 opacity-90 z-50 pointer-events-none"
+/>
 </div>
 
           </motion.div>
