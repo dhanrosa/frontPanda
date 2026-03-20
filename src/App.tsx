@@ -1000,7 +1000,7 @@ const effectiveRatio = imageRatio
           >
         <div
   ref={containerRef}
-  className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center"
+  className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center rounded-[60px]"
 >
   {/* BASE (col2) - SEMPRE visível */}
 {selectedModel?.col2 && (
