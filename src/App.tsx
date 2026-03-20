@@ -386,13 +386,18 @@ const generatePreviewBlob = async (): Promise<Blob> => {
     backgroundColor: null,
     useCORS: true,
     scale: 1.2,
+
     onclone: (clonedDoc) => {
+      // 🔥 REMOVE TUDO QUE NÃO DEVE IR PRA PRÉVIA
       const elementsToHide = clonedDoc.querySelectorAll('[data-no-export="true"]');
+
       elementsToHide.forEach((el) => {
         (el as HTMLElement).style.display = 'none';
       });
 
+      // 🔥 REMOVE BORDA VERDE DO TEXTO (MAS MANTÉM O TEXTO)
       const textBoxes = clonedDoc.querySelectorAll('[data-text-box="true"]');
+
       textBoxes.forEach((el) => {
         const htmlEl = el as HTMLElement;
         htmlEl.style.border = 'none';
@@ -404,12 +409,13 @@ const generatePreviewBlob = async (): Promise<Blob> => {
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
-  if (!blob) {
-    reject(new Error('Não foi possível gerar a prévia.'));
-    return;
-  }
-  resolve(blob);
-}, 'image/jpeg', 0.85);
+      if (!blob) {
+        reject(new Error('Não foi possível gerar a prévia.'));
+        return;
+      }
+
+      resolve(blob);
+    }, 'image/jpeg', 0.85); // 🔥 compressão pra não estourar 10MB
   });
 };
 
@@ -523,7 +529,7 @@ Prévia final:
 ${previewImageUrl}
     `;
 
-    const whatsappUrl = `https://wa.me/5541999999999?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/5541933003156?text=${encodeURIComponent(message)}`;
 
     setOrderCompleted(true);
     window.open(whatsappUrl, '_blank');
@@ -1232,7 +1238,7 @@ ${previewImageUrl}
 {selectedModel?.col2 && (
   <img
   src={selectedModel.col2}
-  crossOrigin="anonymous"
+  data-no-export="true"
   className="absolute top-0 left-0 w-full h-full object-fill"
 />
 )}
