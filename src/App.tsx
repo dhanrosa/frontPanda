@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import type { PhoneModel } from './constants';
 
+
 const GOOGLE_FONTS = [
   { name: 'Lexend', value: "'Lexend', sans-serif" },
   { name: 'Arial', value: 'sans-serif' },
@@ -879,11 +880,11 @@ const effectiveRatio = imageRatio
     </button>
 
     <input
-      type="number"
-      value={textSize}
-      onChange={(e) => setTextSize(Math.max(8, parseInt(e.target.value) || 12))}
-      className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
-    />
+  type="number"
+  value={textSize}
+  onChange={(e) => setTextSize(Math.max(8, parseInt(e.target.value) || 12))}
+  className="no-spinner w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
+/>
 
     <button
       type="button"
@@ -1092,16 +1093,16 @@ const effectiveRatio = imageRatio
   textDecoration: isUnderline ? 'underline' : 'none',
  textShadow:
   textStroke > 0
-    ? `
-      ${textStroke}px 0 ${textStrokeColor},
-      -${textStroke}px 0 ${textStrokeColor},
-      0 ${textStroke}px ${textStrokeColor},
-      0 -${textStroke}px ${textStrokeColor},
-      ${textStroke}px ${textStroke}px ${textStrokeColor},
-      -${textStroke}px -${textStroke}px ${textStrokeColor},
-      ${textStroke}px -${textStroke}px ${textStrokeColor},
-      -${textStroke}px ${textStroke}px ${textStrokeColor}
-    `
+    ? [
+        `${textStroke}px 0 ${textStrokeColor}`,
+        `-${textStroke}px 0 ${textStrokeColor}`,
+        `0 ${textStroke}px ${textStrokeColor}`,
+        `0 -${textStroke}px ${textStrokeColor}`,
+        `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+        `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+        `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+        `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+      ].join(', ')
     : '0 2px 4px rgba(0,0,0,0.18)',
   
   lineHeight: 1.2,
