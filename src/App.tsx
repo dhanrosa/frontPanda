@@ -387,51 +387,17 @@ const generatePreviewBlob = async (): Promise<Blob> => {
     useCORS: true,
     scale: 2,
     onclone: (clonedDoc) => {
-      const clonedContainer = clonedDoc.querySelector('[data-preview-root="true"]') as HTMLElement | null;
+      const elementsToHide = clonedDoc.querySelectorAll('[data-no-export="true"]');
+      elementsToHide.forEach((el) => {
+        (el as HTMLElement).style.display = 'none';
+      });
 
-      if (!clonedContainer) return;
-
-      const allElements = clonedContainer.querySelectorAll<HTMLElement>('*');
-
-      allElements.forEach((el) => {
-        const style = clonedDoc.defaultView?.getComputedStyle(el);
-        if (!style) return;
-
-        const safeColor = (value: string) => {
-          if (!value || value === 'transparent') return value;
-
-          if (value.includes('oklch(')) {
-            if (
-              value.includes('1 ') ||
-              value.includes('0.98') ||
-              value.includes('0.97') ||
-              value.includes('0.95')
-            ) {
-              return '#ffffff';
-            }
-
-            if (
-              value.includes('0 ') ||
-              value.includes('0.14') ||
-              value.includes('0.21') ||
-              value.includes('0.27') ||
-              value.includes('0.37')
-            ) {
-              return '#18181b';
-            }
-
-            return '#d4d4d8';
-          }
-
-          return value;
-        };
-
-        el.style.backgroundColor = safeColor(style.backgroundColor);
-        el.style.color = safeColor(style.color);
-        el.style.borderColor = safeColor(style.borderColor);
-        el.style.outlineColor = safeColor(style.outlineColor);
-        el.style.boxShadow = style.boxShadow.includes('oklch') ? 'none' : style.boxShadow;
-        el.style.textShadow = style.textShadow.includes('oklch') ? 'none' : style.textShadow;
+      const textBoxes = clonedDoc.querySelectorAll('[data-text-box="true"]');
+      textBoxes.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.border = 'none';
+        htmlEl.style.outline = 'none';
+        htmlEl.style.boxShadow = 'none';
       });
     },
   });
@@ -1284,6 +1250,7 @@ ${previewImageUrl}
     }}
   >
     <motion.div
+     data-no-export="true"
   drag
   dragConstraints={dragLimits}
   dragElastic={0}
@@ -1355,8 +1322,11 @@ ${previewImageUrl}
       }}
       className="relative max-w-[75%] select-none"
     >
-      <div className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent">
-        <div
+      <div
+  data-text-box="true"
+  className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent"
+>
+<div
           style={{
   fontFamily: textFont,
   color: textColor,
@@ -1388,7 +1358,10 @@ ${previewImageUrl}
           {customText}
         </div>
 
-<div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+<div
+  data-no-export="true"
+  className="absolute -top-10 left-1/2 ..."
+>
   <button
     onClick={(e) => {
       e.stopPropagation();
@@ -1425,9 +1398,9 @@ ${previewImageUrl}
           className="absolute -bottom-2 -right-2 w-4 h-4 bg-green-600 border border-white rounded-sm cursor-nwse-resize"
         />
 
-        <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-green-600" />
-        <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-green-600" />
-        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-green-600" />
+        <div data-no-export="true" className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-green-600" />
+<div data-no-export="true" className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-green-600" />
+<div data-no-export="true" className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-green-600" />
       </div>
     </motion.div>
   </div>
