@@ -385,7 +385,7 @@ const generatePreviewBlob = async (): Promise<Blob> => {
   const canvas = await html2canvas(containerRef.current, {
     backgroundColor: null,
     useCORS: true,
-    scale: 2,
+    scale: 1.2,
     onclone: (clonedDoc) => {
       const elementsToHide = clonedDoc.querySelectorAll('[data-no-export="true"]');
       elementsToHide.forEach((el) => {
@@ -404,12 +404,12 @@ const generatePreviewBlob = async (): Promise<Blob> => {
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Não foi possível gerar a prévia.'));
-        return;
-      }
-      resolve(blob);
-    }, 'image/png');
+  if (!blob) {
+    reject(new Error('Não foi possível gerar a prévia.'));
+    return;
+  }
+  resolve(blob);
+}, 'image/jpeg', 0.85);
   });
 };
 
