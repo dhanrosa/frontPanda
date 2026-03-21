@@ -382,22 +382,20 @@ const generatePreviewBlob = async (): Promise<Blob> => {
     throw new Error('Área de prévia não encontrada.');
   }
 
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
   const canvas = await html2canvas(containerRef.current, {
     backgroundColor: null,
     useCORS: true,
-    scale: 1.2,
-
+    scale: 1,
+    imageTimeout: 0,
     onclone: (clonedDoc) => {
-      // 🔥 REMOVE TUDO QUE NÃO DEVE IR PRA PRÉVIA
       const elementsToHide = clonedDoc.querySelectorAll('[data-no-export="true"]');
-
       elementsToHide.forEach((el) => {
         (el as HTMLElement).style.display = 'none';
       });
 
-      // 🔥 REMOVE BORDA VERDE DO TEXTO (MAS MANTÉM O TEXTO)
       const textBoxes = clonedDoc.querySelectorAll('[data-text-box="true"]');
-
       textBoxes.forEach((el) => {
         const htmlEl = el as HTMLElement;
         htmlEl.style.border = 'none';
@@ -413,9 +411,8 @@ const generatePreviewBlob = async (): Promise<Blob> => {
         reject(new Error('Não foi possível gerar a prévia.'));
         return;
       }
-
       resolve(blob);
-    }, 'image/jpeg', 0.85); // 🔥 compressão pra não estourar 10MB
+    }, 'image/jpeg', 0.82);
   });
 };
 
@@ -1256,22 +1253,10 @@ ${previewImageUrl}
     }}
   >
     <motion.div
-    
   drag
   dragConstraints={dragLimits}
   dragElastic={0}
   dragMomentum={false}
-  animate={{
-  x: position.x,
-  y: position.y,
-  scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
-  rotate: imageRotation,
-}}
-  transition={{
-    type: 'spring',
-    stiffness: 300,
-    damping: 30,
-  }}
   onDragEnd={(_, info) => {
     setPosition((prev) => {
       const nextX = prev.x + info.offset.x;
@@ -1284,6 +1269,10 @@ ${previewImageUrl}
     });
   }}
   style={{
+    x: position.x,
+    y: position.y,
+    scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
+    rotate: imageRotation,
     width: '100%',
     height: '100%',
     display: 'flex',
@@ -1293,6 +1282,7 @@ ${previewImageUrl}
 >
   <img
   src={image}
+  data-user-image="true"
   draggable={false}
     style={{
       transform: isMirrored ? 'scaleX(-1)' : 'scaleX(1)',
@@ -1366,7 +1356,7 @@ ${previewImageUrl}
 
 <div
   data-no-export="true"
-  className="absolute -top-10 left-1/2 ..."
+  className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto"
 >
   <button
     onClick={(e) => {
