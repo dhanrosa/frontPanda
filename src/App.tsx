@@ -93,6 +93,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const productionRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
 
   const [originalFile, setOriginalFile] = useState<File | null>(null);
@@ -376,54 +377,122 @@ export default function App() {
     });
   };
 
-const waitForImagesToLoad = async (root: HTMLElement) => {
-  const images = Array.from(root.querySelectorAll('img'));
+  const waitForImagesToLoad = async (root: HTMLElement) => {
+    const images = Array.from(root.querySelectorAll('img'));
 
-  await Promise.all(
-    images.map((img) => {
-      if (img.complete && img.naturalWidth > 0) {
-        return Promise.resolve();
-      }
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) {
+          return Promise.resolve();
+        }
 
-      return new Promise<void>((resolve) => {
-        const done = () => resolve();
+        return new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      })
+    );
 
-        img.addEventListener('load', done, { once: true });
-        img.addEventListener('error', done, { once: true });
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  };
+
+  const generateBlobFromElement = async (
+    element: HTMLElement,
+    options?: {
+      format?: 'image/png' | 'image/jpeg';
+      quality?: number;
+      scale?: number;
+      maxBytes?: number;
+    }
+  ): Promise<Blob> => {
+    const {
+      format = 'image/jpeg',
+      quality = 0.9,
+      scale = 1,
+      maxBytes,
+    } = options || {};
+
+    await waitForImagesToLoad(element);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    let currentScale = scale;
+
+    const renderCanvas = async (scaleValue: number) => {
+      return html2canvas(element, {
+        backgroundColor: null,
+        useCORS: true,
+        scale: scaleValue,
+        imageTimeout: 15000,
+        logging: false,
       });
-    })
-  );
+    };
 
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-};
+    let canvas = await renderCanvas(currentScale);
+
+    const canvasToBlob = async (
+      currentCanvas: HTMLCanvasElement,
+      mimeType: 'image/png' | 'image/jpeg',
+      q?: number
+    ) => {
+      return new Promise<Blob>((resolve, reject) => {
+        currentCanvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Não foi possível gerar a imagem.'));
+            return;
+          }
+          resolve(blob);
+        }, mimeType, q);
+      });
+    };
+
+    if (format === 'image/jpeg') {
+      return canvasToBlob(canvas, 'image/jpeg', quality);
+    }
+
+    let blob = await canvasToBlob(canvas, 'image/png');
+
+    while (maxBytes && blob.size > maxBytes && currentScale > 1) {
+      currentScale = Math.max(1, Number((currentScale - 0.25).toFixed(2)));
+      canvas = await renderCanvas(currentScale);
+      blob = await canvasToBlob(canvas, 'image/png');
+
+      if (currentScale === 1) break;
+    }
+
+    if (maxBytes && blob.size > maxBytes) {
+      throw new Error(
+        `A arte final em PNG passou do limite de 10 MB. Tamanho atual: ${(blob.size / 1024 / 1024).toFixed(2)} MB`
+      );
+    }
+
+    return blob;
+  };
 
   const generatePreviewBlob = async (): Promise<Blob> => {
-  if (!exportRef.current) {
-    throw new Error('Área de exportação não encontrada.');
-  }
+    if (!exportRef.current) {
+      throw new Error('Área de preview não encontrada.');
+    }
 
-  await waitForImagesToLoad(exportRef.current);
-  await new Promise((resolve) => setTimeout(resolve, 120));
+    return generateBlobFromElement(exportRef.current, {
+      format: 'image/jpeg',
+      quality: 0.9,
+      scale: 1,
+    });
+  };
 
-  const canvas = await html2canvas(exportRef.current, {
-    backgroundColor: null,
-    useCORS: true,
-    scale: 1,
-    imageTimeout: 15000,
-    logging: false,
-  });
+  const generateProductionBlob = async (): Promise<Blob> => {
+    if (!productionRef.current) {
+      throw new Error('Área de arte final não encontrada.');
+    }
 
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Não foi possível gerar a prévia.'));
-        return;
-      }
-      resolve(blob);
-    }, 'image/jpeg', 0.9);
-  });
-};
+    return generateBlobFromElement(productionRef.current, {
+      format: 'image/png',
+      scale: 3,
+      maxBytes: 10 * 1024 * 1024,
+    });
+  };
 
   const CLOUDINARY_CLOUD_NAME = 'dwexdk5pp';
   const CLOUDINARY_UPLOAD_PRESET = 'pamda_unsigned';
@@ -463,27 +532,23 @@ const waitForImagesToLoad = async (root: HTMLElement) => {
   };
 
   const uploadOrderAssets = async () => {
-    let originalImageUrl = '';
-    let previewImageUrl = '';
-
-    if (originalFile) {
-      originalImageUrl = await uploadToCloudinary(
-        originalFile,
-        'pamda-pedidos/original',
-        `original-${Date.now()}`
-      );
-    }
-
+    const productionBlob = await generateProductionBlob();
     const previewBlob = await generatePreviewBlob();
 
-    previewImageUrl = await uploadToCloudinary(
+    const productionImageUrl = await uploadToCloudinary(
+      productionBlob,
+      'pamda-pedidos/arte-final',
+      `arte-final-${Date.now()}`
+    );
+
+    const previewImageUrl = await uploadToCloudinary(
       previewBlob,
       'pamda-pedidos/preview',
       `preview-${Date.now()}`
     );
 
     return {
-      originalImageUrl,
+      productionImageUrl,
       previewImageUrl,
     };
   };
@@ -505,7 +570,7 @@ const waitForImagesToLoad = async (root: HTMLElement) => {
 
       setIsUploadingOrder(true);
 
-      const { originalImageUrl, previewImageUrl } = await uploadOrderAssets();
+      const { productionImageUrl, previewImageUrl } = await uploadOrderAssets();
 
       const message = `
 *Novo pedido - Pamda Cases*
@@ -529,8 +594,8 @@ Quantidade: ${quantity}
 Valor unitário: R$ ${unitPrice.toFixed(2)}
 Valor total: R$ ${totalPrice.toFixed(2)}
 
-Imagem original:
-${originalImageUrl || 'Não enviada'}
+Arte final:
+${productionImageUrl}
 
 Prévia final:
 ${previewImageUrl}
@@ -1189,7 +1254,7 @@ ${previewImageUrl}
                     drag
                     dragConstraints={dragLimits}
                     dragElastic={0}
-                    dragMomentum={false}
+                    dragMomentum={0}
                     onDragEnd={(_, info) => {
                       setPosition((prev) => {
                         const nextX = prev.x + info.offset.x;
@@ -1234,7 +1299,7 @@ ${previewImageUrl}
                   <motion.div
                     drag
                     dragElastic={0}
-                    dragMomentum={false}
+                    dragMomentum={0}
                     style={{
                       x: textPosition.x,
                       y: textPosition.y,
@@ -1309,7 +1374,7 @@ ${previewImageUrl}
                       <motion.div
                         drag
                         dragElastic={0}
-                        dragMomentum={false}
+                        dragMomentum={0}
                         onDrag={(_, info) => {
                           const delta = info.delta.x + info.delta.y;
                           setTextSize((prev) =>
@@ -1366,144 +1431,279 @@ ${previewImageUrl}
         </div>
 
         <div
-  style={{
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '405px',
-    height: '720px',
-    transform: 'translateX(-200vw)',
-    pointerEvents: 'none',
-    overflow: 'hidden',
-    opacity: 1,
-    zIndex: -1,
-  }}
->
-  <div
-    ref={exportRef}
-    style={{
-      position: 'relative',
-      width: '405px',
-      height: '720px',
-      overflow: 'hidden',
-      background: 'transparent',
-    }}
-  >
-    {!textOnlyMode && image && (
-      <div
-        style={{
-          position: 'absolute',
-          top: '3.5%',
-          bottom: '3.5%',
-          left: '8%',
-          right: '8%',
-          overflow: 'hidden',
-        }}
-      >
-        <div
           style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: exportImageTransform,
-            transformOrigin: 'center center',
-          }}
-        >
-          <img
-            src={image}
-            alt="Arte do cliente"
-            style={{
-              ...(effectiveRatio && effectiveRatio >= 0.95
-                ? { height: '100%', width: 'auto' }
-                : { width: '100%', height: 'auto' }),
-              maxWidth: 'none',
-              maxHeight: 'none',
-              display: 'block',
-            }}
-          />
-        </div>
-      </div>
-    )}
-
-    {customText && (
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 20,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-        }}
-      >
-        <div
-          style={{
-            transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
-            maxWidth: '75%',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '405px',
+            height: '720px',
+            transform: 'translateX(-200vw)',
+            pointerEvents: 'none',
+            overflow: 'hidden',
+            opacity: 1,
+            zIndex: -1,
           }}
         >
           <div
+            ref={exportRef}
             style={{
-              fontFamily: textFont,
-              color: textColor,
-              fontSize: `${textSize}px`,
-              letterSpacing: `${letterSpacing}px`,
-              fontWeight: isBold ? 700 : 400,
-              fontStyle: isItalic ? 'italic' : 'normal',
-              textDecoration: isUnderline ? 'underline' : 'none',
-              textShadow:
-                textStroke > 0
-                  ? [
-                      `${textStroke}px 0 ${textStrokeColor}`,
-                      `-${textStroke}px 0 ${textStrokeColor}`,
-                      `0 ${textStroke}px ${textStrokeColor}`,
-                      `0 -${textStroke}px ${textStrokeColor}`,
-                      `${textStroke}px ${textStroke}px ${textStrokeColor}`,
-                      `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
-                      `${textStroke}px -${textStroke}px ${textStrokeColor}`,
-                      `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
-                    ].join(', ')
-                  : '0 2px 4px rgba(0,0,0,0.18)',
-              lineHeight: 1.2,
-              textAlign: 'center',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
+              position: 'relative',
+              width: '405px',
+              height: '720px',
+              overflow: 'hidden',
+              background: 'transparent',
             }}
           >
-            {customText}
+            {selectedModel?.col2 && (
+              <img
+                src={selectedModel.col2}
+                crossOrigin="anonymous"
+                alt="Base"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'block',
+                  zIndex: 1,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+
+            {!textOnlyMode && image && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '3.5%',
+                  bottom: '3.5%',
+                  left: '8%',
+                  right: '8%',
+                  overflow: 'hidden',
+                  zIndex: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: exportImageTransform,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt="Arte do cliente"
+                    style={{
+                      ...(effectiveRatio && effectiveRatio >= 0.95
+                        ? { height: '100%', width: 'auto' }
+                        : { width: '100%', height: 'auto' }),
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {customText && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
+                    maxWidth: '75%',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: textFont,
+                      color: textColor,
+                      fontSize: `${textSize}px`,
+                      letterSpacing: `${letterSpacing}px`,
+                      fontWeight: isBold ? 700 : 400,
+                      fontStyle: isItalic ? 'italic' : 'normal',
+                      textDecoration: isUnderline ? 'underline' : 'none',
+                      textShadow:
+                        textStroke > 0
+                          ? [
+                              `${textStroke}px 0 ${textStrokeColor}`,
+                              `-${textStroke}px 0 ${textStrokeColor}`,
+                              `0 ${textStroke}px ${textStrokeColor}`,
+                              `0 -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                            ].join(', ')
+                          : '0 2px 4px rgba(0,0,0,0.18)',
+                      lineHeight: 1.2,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {customText}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedModel?.col3 && (
+              <img
+                src={selectedModel.col3}
+                crossOrigin="anonymous"
+                alt="Máscara"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'block',
+                  pointerEvents: 'none',
+                  zIndex: 30,
+                }}
+              />
+            )}
+
+            <img
+              src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+              crossOrigin="anonymous"
+              alt="Pamda"
+              className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
+            />
           </div>
         </div>
-      </div>
-    )}
 
-    {selectedModel?.col3 && (
-      <img
-        src={selectedModel.col3}
-        crossOrigin="anonymous"
-        alt="Máscara"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          pointerEvents: 'none',
-          zIndex: 30,
-        }}
-      />
-    )}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '405px',
+            height: '720px',
+            transform: 'translateX(-400vw)',
+            pointerEvents: 'none',
+            overflow: 'hidden',
+            opacity: 1,
+            zIndex: -1,
+          }}
+        >
+          <div
+            ref={productionRef}
+            style={{
+              position: 'relative',
+              width: '405px',
+              height: '720px',
+              overflow: 'hidden',
+              background: 'transparent',
+            }}
+          >
+            {!textOnlyMode && image && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '3.5%',
+                  bottom: '3.5%',
+                  left: '8%',
+                  right: '8%',
+                  overflow: 'hidden',
+                  zIndex: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: exportImageTransform,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt="Arte do cliente"
+                    style={{
+                      ...(effectiveRatio && effectiveRatio >= 0.95
+                        ? { height: '100%', width: 'auto' }
+                        : { width: '100%', height: 'auto' }),
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
-    <img
-  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-  crossOrigin="anonymous"
-  alt="Pamda"
-  className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
-/>
-  </div>
-</div>
+            {customText && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
+                    maxWidth: '75%',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: textFont,
+                      color: textColor,
+                      fontSize: `${textSize}px`,
+                      letterSpacing: `${letterSpacing}px`,
+                      fontWeight: isBold ? 700 : 400,
+                      fontStyle: isItalic ? 'italic' : 'normal',
+                      textDecoration: isUnderline ? 'underline' : 'none',
+                      textShadow:
+                        textStroke > 0
+                          ? [
+                              `${textStroke}px 0 ${textStrokeColor}`,
+                              `-${textStroke}px 0 ${textStrokeColor}`,
+                              `0 ${textStroke}px ${textStrokeColor}`,
+                              `0 -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                            ].join(', ')
+                          : '0 2px 4px rgba(0,0,0,0.18)',
+                      lineHeight: 1.2,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {customText}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );
