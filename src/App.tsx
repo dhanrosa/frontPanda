@@ -1497,21 +1497,11 @@ ${previewImageUrl}
     )}
 
     <img
-      src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-      crossOrigin="anonymous"
-      alt="Pamda"
-      style={{
-        position: 'absolute',
-        left: '50%',
-        bottom: '18px',
-        transform: 'translateX(-50%)',
-        width: '82px',
-        height: 'auto',
-        display: 'block',
-        zIndex: 40,
-        pointerEvents: 'none',
-      }}
-    />
+  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+  crossOrigin="anonymous"
+  alt="Pamda"
+  className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
+/>
   </div>
 </div>
       </main>
