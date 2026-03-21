@@ -1256,7 +1256,7 @@ ${previewImageUrl}
     }}
   >
     <motion.div
-     data-no-export="true"
+    
   drag
   dragConstraints={dragLimits}
   dragElastic={0}
