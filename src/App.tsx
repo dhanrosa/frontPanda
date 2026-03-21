@@ -376,31 +376,54 @@ export default function App() {
     });
   };
 
+const waitForImagesToLoad = async (root: HTMLElement) => {
+  const images = Array.from(root.querySelectorAll('img'));
+
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        const done = () => resolve();
+
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+      });
+    })
+  );
+
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+};
+
   const generatePreviewBlob = async (): Promise<Blob> => {
-    if (!exportRef.current) {
-      throw new Error('Área de exportação não encontrada.');
-    }
+  if (!exportRef.current) {
+    throw new Error('Área de exportação não encontrada.');
+  }
 
-    await new Promise((resolve) => setTimeout(resolve, 120));
+  await waitForImagesToLoad(exportRef.current);
+  await new Promise((resolve) => setTimeout(resolve, 120));
 
-    const canvas = await html2canvas(exportRef.current, {
-      backgroundColor: null,
-      useCORS: true,
-      scale: 1,
-      imageTimeout: 0,
-      logging: false,
-    });
+  const canvas = await html2canvas(exportRef.current, {
+    backgroundColor: null,
+    useCORS: true,
+    scale: 1,
+    imageTimeout: 15000,
+    logging: false,
+  });
 
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Não foi possível gerar a prévia.'));
-          return;
-        }
-        resolve(blob);
-      }, 'image/jpeg', 0.9);
-    });
-  };
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Não foi possível gerar a prévia.'));
+        return;
+      }
+      resolve(blob);
+    }, 'image/jpeg', 0.9);
+  });
+};
 
   const CLOUDINARY_CLOUD_NAME = 'dwexdk5pp';
   const CLOUDINARY_UPLOAD_PRESET = 'pamda_unsigned';
@@ -1343,135 +1366,154 @@ ${previewImageUrl}
         </div>
 
         <div
+  style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '405px',
+    height: '720px',
+    transform: 'translateX(-200vw)',
+    pointerEvents: 'none',
+    overflow: 'hidden',
+    opacity: 1,
+    zIndex: -1,
+  }}
+>
+  <div
+    ref={exportRef}
+    style={{
+      position: 'relative',
+      width: '405px',
+      height: '720px',
+      overflow: 'hidden',
+      background: 'transparent',
+    }}
+  >
+    {!textOnlyMode && image && (
+      <div
+        style={{
+          position: 'absolute',
+          top: '3.5%',
+          bottom: '3.5%',
+          left: '8%',
+          right: '8%',
+          overflow: 'hidden',
+        }}
+      >
+        <div
           style={{
-            position: 'fixed',
-            left: '-99999px',
-            top: '0',
-            width: '405px',
-            height: '720px',
-            opacity: 1,
-            pointerEvents: 'none',
-            overflow: 'hidden',
-            zIndex: -1,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: exportImageTransform,
+            transformOrigin: 'center center',
+          }}
+        >
+          <img
+            src={image}
+            alt="Arte do cliente"
+            style={{
+              ...(effectiveRatio && effectiveRatio >= 0.95
+                ? { height: '100%', width: 'auto' }
+                : { width: '100%', height: 'auto' }),
+              maxWidth: 'none',
+              maxHeight: 'none',
+              display: 'block',
+            }}
+          />
+        </div>
+      </div>
+    )}
+
+    {customText && (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
+            maxWidth: '75%',
           }}
         >
           <div
-            ref={exportRef}
             style={{
-              position: 'relative',
-              width: '405px',
-              height: '720px',
-              overflow: 'hidden',
-              background: 'transparent',
+              fontFamily: textFont,
+              color: textColor,
+              fontSize: `${textSize}px`,
+              letterSpacing: `${letterSpacing}px`,
+              fontWeight: isBold ? 700 : 400,
+              fontStyle: isItalic ? 'italic' : 'normal',
+              textDecoration: isUnderline ? 'underline' : 'none',
+              textShadow:
+                textStroke > 0
+                  ? [
+                      `${textStroke}px 0 ${textStrokeColor}`,
+                      `-${textStroke}px 0 ${textStrokeColor}`,
+                      `0 ${textStroke}px ${textStrokeColor}`,
+                      `0 -${textStroke}px ${textStrokeColor}`,
+                      `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                      `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                      `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                      `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                    ].join(', ')
+                  : '0 2px 4px rgba(0,0,0,0.18)',
+              lineHeight: 1.2,
+              textAlign: 'center',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
-            {!textOnlyMode && image && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '3.5%',
-                  bottom: '3.5%',
-                  left: '8%',
-                  right: '8%',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transform: exportImageTransform,
-                    transformOrigin: 'center center',
-                  }}
-                >
-                  <img
-                    src={image}
-                    alt="Arte do cliente"
-                    style={{
-                      ...(effectiveRatio && effectiveRatio >= 0.95
-                        ? { height: '100%', width: 'auto' }
-                        : { width: '100%', height: 'auto' }),
-                      maxWidth: 'none',
-                      maxHeight: 'none',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {customText && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  zIndex: 20,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
-                <div
-                  style={{
-                    transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
-                    maxWidth: '75%',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: textFont,
-                      color: textColor,
-                      fontSize: `${textSize}px`,
-                      letterSpacing: `${letterSpacing}px`,
-                      fontWeight: isBold ? 700 : 400,
-                      fontStyle: isItalic ? 'italic' : 'normal',
-                      textDecoration: isUnderline ? 'underline' : 'none',
-                      textShadow:
-                        textStroke > 0
-                          ? [
-                              `${textStroke}px 0 ${textStrokeColor}`,
-                              `-${textStroke}px 0 ${textStrokeColor}`,
-                              `0 ${textStroke}px ${textStrokeColor}`,
-                              `0 -${textStroke}px ${textStrokeColor}`,
-                              `${textStroke}px ${textStroke}px ${textStrokeColor}`,
-                              `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
-                              `${textStroke}px -${textStroke}px ${textStrokeColor}`,
-                              `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
-                            ].join(', ')
-                          : '0 2px 4px rgba(0,0,0,0.18)',
-                      lineHeight: 1.2,
-                      textAlign: 'center',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {customText}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {selectedModel?.col3 && (
-              <img
-                src={selectedModel.col3}
-                crossOrigin="anonymous"
-                alt="Máscara"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none',
-                  zIndex: 30,
-                }}
-              />
-            )}
+            {customText}
           </div>
         </div>
+      </div>
+    )}
+
+    {selectedModel?.col3 && (
+      <img
+        src={selectedModel.col3}
+        crossOrigin="anonymous"
+        alt="Máscara"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          pointerEvents: 'none',
+          zIndex: 30,
+        }}
+      />
+    )}
+
+    <img
+      src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+      crossOrigin="anonymous"
+      alt="Pamda"
+      style={{
+        position: 'absolute',
+        left: '50%',
+        bottom: '18px',
+        transform: 'translateX(-50%)',
+        width: '82px',
+        height: 'auto',
+        display: 'block',
+        zIndex: 40,
+        pointerEvents: 'none',
+      }}
+    />
+  </div>
+</div>
       </main>
     </div>
   );
