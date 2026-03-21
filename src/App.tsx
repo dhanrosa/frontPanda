@@ -105,12 +105,16 @@ const [orderCompleted, setOrderCompleted] = useState(false);
 }, [phoneModels]);
 
   const filteredModels = useMemo(() => {
-    return phoneModels.filter(
-      (m) =>
-        m.brand === selectedBrand &&
-        m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const query = searchQuery.trim().toLowerCase();
+
+  if (query) {
+    return phoneModels.filter((m) =>
+      `${m.brand} ${m.name}`.toLowerCase().includes(query)
     );
-  }, [selectedBrand, searchQuery, phoneModels]);
+  }
+
+  return phoneModels.filter((m) => m.brand === selectedBrand);
+}, [selectedBrand, searchQuery, phoneModels]);
 
 const normalizedRotation = ((imageRotation % 360) + 360) % 360;
 
@@ -678,7 +682,10 @@ ${previewImageUrl}
               {filteredModels.map((model) => (
                 <button
                   key={model.id}
-                  onClick={() => setSelectedModel(model)}
+                  onClick={() => {
+  setSelectedBrand(model.brand);
+  setSelectedModel(model);
+}}
                   className={`flex items-center justify-between p-3 rounded-xl text-left transition-all ${selectedModel?.id === model.id
                     ? 'bg-indigo-50 border-indigo-200 border text-indigo-700'
                     : 'bg-white border border-zinc-100 hover:border-zinc-300 text-zinc-700'
