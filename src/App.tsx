@@ -11,7 +11,6 @@ import {
   ZoomIn,
   ZoomOut,
   Move,
-  Image as ImageIcon,
   X,
   Download,
   ChevronRight,
@@ -19,7 +18,6 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronLeft,
-  Apple,
   Type,
   FlipHorizontal,
   RotateCw,
@@ -29,7 +27,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { PhoneModel } from './constants';
-
 
 const GOOGLE_FONTS = [
   { name: 'Lexend', value: "'Lexend', sans-serif" },
@@ -63,13 +60,13 @@ export default function App() {
   const [imageRatio, setImageRatio] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragLimits, setDragLimits] = useState({
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-});
-  
-const [isUploadingOrder, setIsUploadingOrder] = useState(false);
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  });
+
+  const [isUploadingOrder, setIsUploadingOrder] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [phoneModels, setPhoneModels] = useState<PhoneModel[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
@@ -81,7 +78,6 @@ const [isUploadingOrder, setIsUploadingOrder] = useState(false);
 
   const [customText, setCustomText] = useState('');
   const [textColor, setTextColor] = useState('#000000');
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [textFont, setTextFont] = useState(GOOGLE_FONTS[0].value);
   const [textSize, setTextSize] = useState(24);
   const [letterSpacing, setLetterSpacing] = useState(0);
@@ -89,64 +85,63 @@ const [isUploadingOrder, setIsUploadingOrder] = useState(false);
   const [textRotation, setTextRotation] = useState(0);
   const [imageRotation, setImageRotation] = useState(0);
   const [isBold, setIsBold] = useState(false);
-const [isItalic, setIsItalic] = useState(false);
-const [isUnderline, setIsUnderline] = useState(false);
-const [textStroke, setTextStroke] = useState(0);
-const [textStrokeColor, setTextStrokeColor] = useState('#000000');
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [textStroke, setTextStroke] = useState(0);
+  const [textStrokeColor, setTextStrokeColor] = useState('#000000');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState(1);
-const [orderCompleted, setOrderCompleted] = useState(false);
+  const [orderCompleted, setOrderCompleted] = useState(false);
+
   const brands = useMemo(() => {
-  return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
-}, [phoneModels]);
+    return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
+  }, [phoneModels]);
 
   const filteredModels = useMemo(() => {
-  const query = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
 
-  if (query) {
-    return phoneModels.filter((m) =>
-      `${m.brand} ${m.name}`.toLowerCase().includes(query)
-    );
-  }
+    if (query) {
+      return phoneModels.filter((m) =>
+        `${m.brand} ${m.name}`.toLowerCase().includes(query)
+      );
+    }
 
-  return phoneModels.filter((m) => m.brand === selectedBrand);
-}, [selectedBrand, searchQuery, phoneModels]);
+    return phoneModels.filter((m) => m.brand === selectedBrand);
+  }, [selectedBrand, searchQuery, phoneModels]);
 
-const normalizedRotation = ((imageRotation % 360) + 360) % 360;
+  const normalizedRotation = ((imageRotation % 360) + 360) % 360;
+  const isQuarterTurn = normalizedRotation === 90 || normalizedRotation === 270;
 
-const isQuarterTurn =
-  normalizedRotation === 90 || normalizedRotation === 270;
+  const effectiveRatio = imageRatio
+    ? isQuarterTurn
+      ? 1 / imageRatio
+      : imageRatio
+    : 1;
 
-const effectiveRatio = imageRatio
-  ? (isQuarterTurn ? 1 / imageRatio : imageRatio)
-  : 1;
-
-  function mapSheetRowToPhoneModel(row: any): PhoneModel | null {
-    if (!row.marca || !row.modelo) return null;
-
-    return {
-      id: String(row.modelo).toLowerCase().replace(/\s+/g, '-'),
-      name: String(row.modelo).trim(),
-      brand: String(row.marca).trim(),
-      color: row.cor ? String(row.cor).trim() : '#1a1a1a',
-      cameraLayout: (row.cameralayout || 'single-top-left') as PhoneModel['cameraLayout'],
-      hasLogo: String(row.haslogo).toLowerCase() === 'true',
-    };
-  }
+  const exportImageTransform = useMemo(() => {
+    const mirror = isMirrored ? ' scaleX(-1)' : '';
+    return `translate(${position.x}px, ${position.y}px) rotate(${imageRotation}deg) scale(${(zoom / 100) * (isQuarterTurn ? 1.95 : 1)})${mirror}`;
+  }, [position.x, position.y, imageRotation, zoom, isQuarterTurn, isMirrored]);
 
   const getDirectImageUrl = (url: string) => {
     if (!url || typeof url !== 'string') return '';
     const trimmedUrl = url.trim();
+
     if (trimmedUrl.includes('drive.google.com')) {
-      const idMatch = trimmedUrl.match(/\/d\/([^\/]+)/) || trimmedUrl.match(/id=([^&]+)/);
+      const idMatch =
+        trimmedUrl.match(/\/d\/([^\/]+)/) || trimmedUrl.match(/id=([^&]+)/);
+
       if (idMatch && idMatch[1]) {
         return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
       }
     }
+
     return trimmedUrl;
   };
 
@@ -171,7 +166,10 @@ const effectiveRatio = imageRatio
           const res = await fetch(url);
           const text = await res.text();
 
-          const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+          const match = text.match(
+            /google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/
+          );
+
           if (!match) {
             console.warn(`Não consegui achar JSON na aba ${sheet.brand}`);
             continue;
@@ -182,13 +180,12 @@ const effectiveRatio = imageRatio
 
           if (!rawRows.length) continue;
 
-          // remove cabeçalho
           const dataRows = rawRows.slice(1);
 
           dataRows.forEach((row: any) => {
-            const col1 = String(row.c?.[0]?.v ?? '').trim(); // nome
-            const col2Raw = String(row.c?.[1]?.v ?? '').trim(); // coluna 2
-            const col3Raw = String(row.c?.[2]?.v ?? '').trim(); // coluna 3
+            const col1 = String(row.c?.[0]?.v ?? '').trim();
+            const col2Raw = String(row.c?.[1]?.v ?? '').trim();
+            const col3Raw = String(row.c?.[2]?.v ?? '').trim();
 
             if (!col1) return;
 
@@ -199,10 +196,8 @@ const effectiveRatio = imageRatio
               id: `${sheet.brand}-${col1}`.toLowerCase().replace(/\s+/g, '-'),
               name: col1,
               brand: sheet.brand,
-
-              col2: col2,
-              col3: col3,
-
+              col2,
+              col3,
               color: '#1a1a1a',
               cameraLayout: 'single-top-left',
               hasLogo: sheet.brand.toLowerCase() === 'apple',
@@ -224,7 +219,6 @@ const effectiveRatio = imageRatio
           setSelectedBrand('');
           setSelectedModel(null);
         }
-
       } catch (err) {
         console.error('Erro ao buscar sheets:', err);
         setPhoneModels([]);
@@ -235,81 +229,82 @@ const effectiveRatio = imageRatio
 
     loadSheet();
   }, []);
+
   useEffect(() => {
-  if (!imageAreaRef.current || !image || !effectiveRatio) return;
+    if (!imageAreaRef.current || !image || !effectiveRatio) return;
 
-  const updateLimits = () => {
-    const areaRect = imageAreaRef.current?.getBoundingClientRect();
-    if (!areaRect) return;
+    const updateLimits = () => {
+      const areaRect = imageAreaRef.current?.getBoundingClientRect();
+      if (!areaRect) return;
 
-    const areaWidth = areaRect.width;
-    const areaHeight = areaRect.height;
+      const areaWidth = areaRect.width;
+      const areaHeight = areaRect.height;
 
-    let fittedWidth = 0;
-    let fittedHeight = 0;
+      let fittedWidth = 0;
+      let fittedHeight = 0;
 
-    if (effectiveRatio >= 0.95) {
-      fittedHeight = areaHeight;
-      fittedWidth = areaHeight * effectiveRatio;
-    } else {
-      fittedWidth = areaWidth;
-      fittedHeight = areaWidth / effectiveRatio;
-    }
+      if (effectiveRatio >= 0.95) {
+        fittedHeight = areaHeight;
+        fittedWidth = areaHeight * effectiveRatio;
+      } else {
+        fittedWidth = areaWidth;
+        fittedHeight = areaWidth / effectiveRatio;
+      }
 
-    const scaleMultiplier = (zoom / 100) * (isQuarterTurn ? 1.02 : 1);
+      const scaleMultiplier = (zoom / 100) * (isQuarterTurn ? 1.02 : 1);
 
-    const finalWidth = fittedWidth * scaleMultiplier;
-    const finalHeight = fittedHeight * scaleMultiplier;
+      const finalWidth = fittedWidth * scaleMultiplier;
+      const finalHeight = fittedHeight * scaleMultiplier;
 
-    const overflowX = Math.max(0, (finalWidth - areaWidth) / 2);
-    const overflowY = Math.max(0, (finalHeight - areaHeight) / 2);
+      const overflowX = Math.max(0, (finalWidth - areaWidth) / 2);
+      const overflowY = Math.max(0, (finalHeight - areaHeight) / 2);
 
-    setDragLimits({
-      left: -overflowX,
-      right: overflowX,
-      top: -overflowY,
-      bottom: overflowY,
-    });
+      setDragLimits({
+        left: -overflowX,
+        right: overflowX,
+        top: -overflowY,
+        bottom: overflowY,
+      });
 
-    setPosition((prev) => ({
-      x: Math.max(-overflowX, Math.min(overflowX, prev.x)),
-      y: Math.max(-overflowY, Math.min(overflowY, prev.y)),
-    }));
-  };
-
-  const raf = requestAnimationFrame(updateLimits);
-  window.addEventListener('resize', updateLimits);
-
-  return () => {
-    cancelAnimationFrame(raf);
-    window.removeEventListener('resize', updateLimits);
-  };
-}, [image, zoom, effectiveRatio, isQuarterTurn, selectedModel?.id]);
-
-const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-
-  if (file) {
-    setOriginalFile(file);
-
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const imageData = event.target?.result as string;
-
-      const img = new Image();
-      img.onload = () => {
-        const ratio = img.width / img.height;
-        setImageRatio(ratio);
-      };
-
-      img.src = imageData;
-      setImage(imageData);
+      setPosition((prev) => ({
+        x: Math.max(-overflowX, Math.min(overflowX, prev.x)),
+        y: Math.max(-overflowY, Math.min(overflowY, prev.y)),
+      }));
     };
 
-    reader.readAsDataURL(file);
-  }
-};
+    const raf = requestAnimationFrame(updateLimits);
+    window.addEventListener('resize', updateLimits);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updateLimits);
+    };
+  }, [image, zoom, effectiveRatio, isQuarterTurn, selectedModel?.id]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (file) {
+      setOriginalFile(file);
+
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        const imageData = event.target?.result as string;
+
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.width / img.height;
+          setImageRatio(ratio);
+        };
+
+        img.src = imageData;
+        setImage(imageData);
+      };
+
+      reader.readAsDataURL(file);
+    }
+  };
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -321,32 +316,32 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   const onDrop = (e: React.DragEvent) => {
-  e.preventDefault();
-  setIsDragging(false);
+    e.preventDefault();
+    setIsDragging(false);
 
-  const file = e.dataTransfer.files?.[0];
+    const file = e.dataTransfer.files?.[0];
 
-  if (file && file.type.startsWith('image/')) {
-    setOriginalFile(file);
+    if (file && file.type.startsWith('image/')) {
+      setOriginalFile(file);
 
-    const reader = new FileReader();
+      const reader = new FileReader();
 
-    reader.onload = (event) => {
-      const imageData = event.target?.result as string;
+      reader.onload = (event) => {
+        const imageData = event.target?.result as string;
 
-      const img = new Image();
-      img.onload = () => {
-        const ratio = img.width / img.height;
-        setImageRatio(ratio);
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.width / img.height;
+          setImageRatio(ratio);
+        };
+
+        img.src = imageData;
+        setImage(imageData);
       };
 
-      img.src = imageData;
-      setImage(imageData);
-    };
-
-    reader.readAsDataURL(file);
-  }
-};
+      reader.readAsDataURL(file);
+    }
+  };
 
   const resetTransform = () => {
     setZoom(100);
@@ -363,145 +358,133 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   const moveImage = (direction: 'up' | 'down' | 'left' | 'right') => {
-  const step = 30;
+    const step = 30;
 
-  setPosition((prev) => {
-    let newX = prev.x;
-    let newY = prev.y;
+    setPosition((prev) => {
+      let newX = prev.x;
+      let newY = prev.y;
 
-    if (direction === 'up') newY -= step;
-    if (direction === 'down') newY += step;
-    if (direction === 'left') newX -= step;
-    if (direction === 'right') newX += step;
+      if (direction === 'up') newY -= step;
+      if (direction === 'down') newY += step;
+      if (direction === 'left') newX -= step;
+      if (direction === 'right') newX += step;
+
+      return {
+        x: Math.max(dragLimits.left, Math.min(dragLimits.right, newX)),
+        y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, newY)),
+      };
+    });
+  };
+
+  const generatePreviewBlob = async (): Promise<Blob> => {
+    if (!exportRef.current) {
+      throw new Error('Área de exportação não encontrada.');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    const canvas = await html2canvas(exportRef.current, {
+      backgroundColor: null,
+      useCORS: true,
+      scale: 1,
+      imageTimeout: 0,
+      logging: false,
+    });
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Não foi possível gerar a prévia.'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg', 0.9);
+    });
+  };
+
+  const CLOUDINARY_CLOUD_NAME = 'dwexdk5pp';
+  const CLOUDINARY_UPLOAD_PRESET = 'pamda_unsigned';
+
+  const uploadToCloudinary = async (
+    file: File | Blob,
+    folder: string,
+    fileName?: string
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', folder);
+
+    if (fileName) {
+      formData.append('public_id', fileName);
+    }
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Erro Cloudinary:', data);
+      throw new Error(
+        data?.error?.message || 'Erro ao enviar imagem para o Cloudinary.'
+      );
+    }
+
+    return data.secure_url as string;
+  };
+
+  const uploadOrderAssets = async () => {
+    let originalImageUrl = '';
+    let previewImageUrl = '';
+
+    if (originalFile) {
+      originalImageUrl = await uploadToCloudinary(
+        originalFile,
+        'pamda-pedidos/original',
+        `original-${Date.now()}`
+      );
+    }
+
+    const previewBlob = await generatePreviewBlob();
+
+    previewImageUrl = await uploadToCloudinary(
+      previewBlob,
+      'pamda-pedidos/preview',
+      `preview-${Date.now()}`
+    );
 
     return {
-      x: Math.max(dragLimits.left, Math.min(dragLimits.right, newX)),
-      y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, newY)),
+      originalImageUrl,
+      previewImageUrl,
     };
-  });
-};
-
-const generatePreviewBlob = async (): Promise<Blob> => {
-  if (!containerRef.current) {
-    throw new Error('Área de prévia não encontrada.');
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 120));
-
-  const canvas = await html2canvas(containerRef.current, {
-    backgroundColor: null,
-    useCORS: true,
-    scale: 1,
-    imageTimeout: 0,
-    onclone: (clonedDoc) => {
-      const elementsToHide = clonedDoc.querySelectorAll('[data-no-export="true"]');
-      elementsToHide.forEach((el) => {
-        (el as HTMLElement).style.display = 'none';
-      });
-
-      const textBoxes = clonedDoc.querySelectorAll('[data-text-box="true"]');
-      textBoxes.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        htmlEl.style.border = 'none';
-        htmlEl.style.outline = 'none';
-        htmlEl.style.boxShadow = 'none';
-      });
-    },
-  });
-
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('Não foi possível gerar a prévia.'));
-        return;
-      }
-      resolve(blob);
-    }, 'image/jpeg', 0.82);
-  });
-};
-
-const CLOUDINARY_CLOUD_NAME = 'dwexdk5pp';
-const CLOUDINARY_UPLOAD_PRESET = 'pamda_unsigned';
-
-const uploadToCloudinary = async (
-  file: File | Blob,
-  folder: string,
-  fileName?: string
-) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  formData.append('folder', folder);
-
-  if (fileName) {
-    formData.append('public_id', fileName);
-  }
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-    {
-      method: 'POST',
-      body: formData,
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error('Erro Cloudinary:', data);
-    throw new Error(data?.error?.message || 'Erro ao enviar imagem para o Cloudinary.');
-  }
-
-  return data.secure_url as string;
-};
-
-
-const uploadOrderAssets = async () => {
-  let originalImageUrl = '';
-  let previewImageUrl = '';
-
-  if (originalFile) {
-    originalImageUrl = await uploadToCloudinary(
-      originalFile,
-      'pamda-pedidos/original',
-      `original-${Date.now()}`
-    );
-  }
-
-  const previewBlob = await generatePreviewBlob();
-
-  previewImageUrl = await uploadToCloudinary(
-    previewBlob,
-    'pamda-pedidos/preview',
-    `preview-${Date.now()}`
-  );
-
-  return {
-    originalImageUrl,
-    previewImageUrl,
   };
-};
 
-  const unitPrice = 54.90;
+  const unitPrice = 54.9;
   const totalPrice = unitPrice * quantity;
 
- const handleFinish = async () => {
-  try {
-    if (!selectedModel) {
-      alert('Selecione o modelo do celular.');
-      return;
-    }
+  const handleFinish = async () => {
+    try {
+      if (!selectedModel) {
+        alert('Selecione o modelo do celular.');
+        return;
+      }
 
-    if (!image && !customText.trim()) {
-      alert('Envie uma imagem ou adicione um texto para personalizar.');
-      return;
-    }
+      if (!image && !customText.trim()) {
+        alert('Envie uma imagem ou adicione um texto para personalizar.');
+        return;
+      }
 
-    setIsUploadingOrder(true);
+      setIsUploadingOrder(true);
 
-    const { originalImageUrl, previewImageUrl } = await uploadOrderAssets();
+      const { originalImageUrl, previewImageUrl } = await uploadOrderAssets();
 
-    const message = `
+      const message = `
 *Novo pedido - Pamda Cases*
 Modelo: ${selectedModel.name}
 Marca: ${selectedBrand}
@@ -528,94 +511,23 @@ ${originalImageUrl || 'Não enviada'}
 
 Prévia final:
 ${previewImageUrl}
-    `;
+      `;
 
-    const whatsappUrl = `https://wa.me/5541933003156?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/5541933003156?text=${encodeURIComponent(
+        message
+      )}`;
 
-    setOrderCompleted(true);
-    window.open(whatsappUrl, '_blank');
-  } catch (error) {
-  console.error(error);
-  const errorMessage =
-    error instanceof Error ? error.message : 'Não foi possível finalizar o pedido.';
-  alert(errorMessage);
-} finally {
-    setIsUploadingOrder(false);
-  }
-};
-
-  const CameraModule = ({ layout }: { layout: PhoneModel['cameraLayout'] }) => {
-    switch (layout) {
-      case 'iphone-11':
-        return (
-          <div className="absolute top-6 left-6 w-28 h-28 bg-white/10 backdrop-blur-md rounded-[2.5rem] p-3 z-30 flex flex-col items-center justify-center gap-2 shadow-[inset_0_0_20px_rgba(255,255,255,0.2),0_10px_20px_rgba(0,0,0,0.1)] border border-white/20">
-            <div className="relative w-11 h-11 bg-zinc-900 rounded-full border-[4px] border-zinc-800 shadow-[0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-tr from-blue-900/40 to-transparent opacity-60" />
-              <div className="absolute w-3 h-3 bg-blue-400/20 rounded-full blur-[2px]" />
-            </div>
-            <div className="relative w-11 h-11 bg-zinc-900 rounded-full border-[4px] border-zinc-800 shadow-[0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-tr from-blue-900/40 to-transparent opacity-60" />
-              <div className="absolute w-3 h-3 bg-blue-400/20 rounded-full blur-[2px]" />
-            </div>
-            <div className="absolute top-1/2 right-4 -translate-y-1/2 flex flex-col items-center gap-2">
-              <div className="w-3 h-3 bg-amber-100 rounded-full shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
-              <div className="w-1.5 h-1.5 bg-zinc-800 rounded-full" />
-            </div>
-          </div>
-        );
-
-      case 'single-top-left':
-        return (
-          <div className="absolute top-8 left-8 w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-inner z-30 border border-white/10">
-            <div className="w-8 h-8 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-inner" />
-          </div>
-        );
-
-      case 'dual-vertical-left':
-        return (
-          <div className="absolute top-8 left-8 w-16 h-32 bg-white/10 backdrop-blur-sm rounded-[1.8rem] flex flex-col items-center justify-around py-4 shadow-inner z-30 border border-white/10">
-            <div className="w-10 h-10 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-inner" />
-            <div className="w-10 h-10 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-inner" />
-          </div>
-        );
-
-      case 'dual-diagonal-left':
-        return (
-          <div className="absolute top-8 left-8 w-28 h-28 bg-white/10 backdrop-blur-sm rounded-[2.2rem] p-4 z-30 grid grid-cols-2 gap-2 border border-white/10">
-            <div className="w-10 h-10 bg-zinc-950 rounded-full self-start justify-self-start border-2 border-zinc-800" />
-            <div className="w-10 h-10 bg-zinc-950 rounded-full self-end justify-self-end border-2 border-zinc-800" />
-          </div>
-        );
-
-      case 'triple-square-left':
-        return (
-          <div className="absolute top-8 left-8 w-32 h-32 bg-white/10 backdrop-blur-md rounded-[2.8rem] p-5 z-30 grid grid-cols-2 gap-3 border border-white/10">
-            <div className="w-10 h-10 bg-zinc-950 rounded-full border-2 border-zinc-800" />
-            <div className="w-10 h-10 bg-zinc-950 rounded-full border-2 border-zinc-800" />
-            <div className="w-10 h-10 bg-zinc-950 rounded-full border-2 border-zinc-800 col-span-2 justify-self-center" />
-          </div>
-        );
-
-      case 'vertical-strip-left':
-        return (
-          <div className="absolute top-8 left-6 flex flex-col gap-4 z-30">
-            <div className="w-11 h-11 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-lg" />
-            <div className="w-11 h-11 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-lg" />
-            <div className="w-11 h-11 bg-zinc-950 rounded-full border-2 border-zinc-800 shadow-lg" />
-          </div>
-        );
-
-      case 'centered-circle':
-        return (
-          <div className="absolute top-12 left-1/2 -translate-x-1/2 w-28 h-28 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-inner z-30 border border-white/10">
-            <div className="w-20 h-20 bg-zinc-950 rounded-full border-4 border-zinc-800 shadow-inner flex items-center justify-center">
-              <div className="w-6 h-6 bg-zinc-900 rounded-full opacity-50" />
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
+      setOrderCompleted(true);
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error(error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível finalizar o pedido.';
+      alert(errorMessage);
+    } finally {
+      setIsUploadingOrder(false);
     }
   };
 
@@ -625,10 +537,10 @@ ${previewImageUrl}
         <div className="p-8 border-b border-zinc-100/50 text-center">
           <div className="mb-4">
             <img
-  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-  alt="Logo Pamda Cases"
-  className="w-48 h-auto mx-auto"
-/>
+              src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+              alt="Logo Pamda Cases"
+              className="w-48 h-auto mx-auto"
+            />
           </div>
           <h2 className="font-lexend font-bold text-zinc-800 text-lg">
             Sua capinha, do seu jeito!
@@ -657,10 +569,11 @@ ${previewImageUrl}
                       setSelectedModel(firstModelOfBrand);
                     }
                   }}
-                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedBrand === brand
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                    selectedBrand === brand
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
                 >
                   {brand}
                 </button>
@@ -671,7 +584,7 @@ ${previewImageUrl}
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Buscar modelo..."
+                placeholder="Buscar modelo ou marca..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
@@ -683,16 +596,24 @@ ${previewImageUrl}
                 <button
                   key={model.id}
                   onClick={() => {
-  setSelectedBrand(model.brand);
-  setSelectedModel(model);
-}}
-                  className={`flex items-center justify-between p-3 rounded-xl text-left transition-all ${selectedModel?.id === model.id
-                    ? 'bg-indigo-50 border-indigo-200 border text-indigo-700'
-                    : 'bg-white border border-zinc-100 hover:border-zinc-300 text-zinc-700'
-                    }`}
+                    setSelectedBrand(model.brand);
+                    setSelectedModel(model);
+                  }}
+                  className={`flex items-center justify-between p-3 rounded-xl text-left transition-all ${
+                    selectedModel?.id === model.id
+                      ? 'bg-indigo-50 border-indigo-200 border text-indigo-700'
+                      : 'bg-white border border-zinc-100 hover:border-zinc-300 text-zinc-700'
+                  }`}
                 >
-                  <span className="text-sm font-medium">{model.name}</span>
-                  {selectedModel?.id === model.id && <ChevronRight className="w-4 h-4" />}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{model.name}</span>
+                    {searchQuery.trim() && (
+                      <span className="text-[11px] text-zinc-400">{model.brand}</span>
+                    )}
+                  </div>
+                  {selectedModel?.id === model.id && (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
                 </button>
               ))}
             </div>
@@ -710,9 +631,10 @@ ${previewImageUrl}
               className={`
                 relative group cursor-pointer border-2 border-dashed rounded-2xl p-6 transition-all duration-200
                 flex flex-col items-center justify-center gap-3 text-center
-                ${isDragging
-                  ? 'border-indigo-500 bg-indigo-50/50'
-                  : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
+                ${
+                  isDragging
+                    ? 'border-indigo-500 bg-indigo-50/50'
+                    : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
                 }
               `}
             >
@@ -775,10 +697,11 @@ ${previewImageUrl}
                     <div className="flex flex-col items-center gap-1.5">
                       <button
                         onClick={() => setIsMirrored(!isMirrored)}
-                        className={`p-2.5 rounded-lg transition-all ${isMirrored
-                          ? 'bg-indigo-600 text-white shadow-lg'
-                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                          }`}
+                        className={`p-2.5 rounded-lg transition-all ${
+                          isMirrored
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                        }`}
                       >
                         <FlipHorizontal className="w-4 h-4" />
                       </button>
@@ -871,11 +794,11 @@ ${previewImageUrl}
                   </button>
                   <button
                     onClick={() => {
-  setImage(null);
-  setOriginalFile(null);
-  setImageRatio(null);
-  setPosition({ x: 0, y: 0 });
-}}
+                      setImage(null);
+                      setOriginalFile(null);
+                      setImageRatio(null);
+                      setPosition({ x: 0, y: 0 });
+                    }}
                     className="p-2.5 rounded-xl border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-all"
                   >
                     <X className="w-5 h-5" />
@@ -926,78 +849,75 @@ ${previewImageUrl}
               </div>
 
               <div className="relative">
-  <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400" />
-  <textarea
-    placeholder="Escreva seu texto..."
-    value={customText}
-    onChange={(e) => setCustomText(e.target.value)}
-    rows={3}
-    className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
-  />
-</div>
+                <Type className="absolute left-3 top-3 w-4 h-4 text-zinc-400" />
+                <textarea
+                  placeholder="Escreva seu texto..."
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                  rows={3}
+                  className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
+                />
+              </div>
 
-<div className="flex items-center gap-2 mt-2">
-  {/* BOLD */}
-  <button
-    type="button"
-    onClick={() => setIsBold(!isBold)}
-    className={`p-2 rounded ${
-      isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
-    }`}
-  >
-    <Bold className="w-4 h-4" />
-  </button>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBold(!isBold)}
+                  className={`p-2 rounded ${
+                    isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Bold className="w-4 h-4" />
+                </button>
 
-  {/* ITALICO */}
-  <button
-    type="button"
-    onClick={() => setIsItalic(!isItalic)}
-    className={`p-2 rounded ${
-      isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
-    }`}
-  >
-    <Italic className="w-4 h-4" />
-  </button>
+                <button
+                  type="button"
+                  onClick={() => setIsItalic(!isItalic)}
+                  className={`p-2 rounded ${
+                    isItalic
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Italic className="w-4 h-4" />
+                </button>
 
-  {/* SUBLINHADO */}
-  <button
-    type="button"
-    onClick={() => setIsUnderline(!isUnderline)}
-    className={`p-2 rounded ${
-      isUnderline ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
-    }`}
-  >
-    <Underline className="w-4 h-4" />
-  </button>
+                <button
+                  type="button"
+                  onClick={() => setIsUnderline(!isUnderline)}
+                  className={`p-2 rounded ${
+                    isUnderline
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Underline className="w-4 h-4" />
+                </button>
 
-  {/* DIVISOR */}
-  <div className="w-px h-3 bg-zinc-300 mx-1" />
+                <div className="w-px h-3 bg-zinc-300 mx-1" />
 
-  {/* ESPAÇAMENTO */}
-  <div className="flex items-center gap-1">
-    <span className="text-xs text-zinc-800">Espaçamento</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-zinc-800">Espaçamento</span>
 
-    <button
-      type="button"
-      onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
-      className="px-3 py-1 bg-zinc-100 rounded text-xs"
-    >
-      -
-    </button>
+                  <button
+                    type="button"
+                    onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
+                    className="px-3 py-1 bg-zinc-100 rounded text-xs"
+                  >
+                    -
+                  </button>
 
-    <span className="text-xs w-8 text-center">{letterSpacing}</span>
+                  <span className="text-xs w-8 text-center">{letterSpacing}</span>
 
-    <button
-      type="button"
-      onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
-      className="px-3 py-1 bg-zinc-100 rounded text-xs"
-    >
-      +
-    </button>
-  </div>
-</div>
-
-
+                  <button
+                    type="button"
+                    onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
+                    className="px-3 py-1 bg-zinc-100 rounded text-xs"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
@@ -1022,200 +942,191 @@ ${previewImageUrl}
                 </div>
 
                 <div className="space-y-1">
-  <label className="text-[10px] font-bold text-zinc-400 uppercase">
-    Tamanho
-  </label>
-  <div className="flex items-center gap-2">
-    <button
-      type="button"
-      onClick={() => setTextSize((prev) => Math.max(8, prev - 2))}
-      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-    >
-      -
-    </button>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">
+                    Tamanho
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTextSize((prev) => Math.max(8, prev - 2))}
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                    >
+                      -
+                    </button>
 
-    <input
-  type="number"
-  value={textSize}
-  onChange={(e) => setTextSize(Math.max(8, parseInt(e.target.value) || 12))}
-  className="no-spinner w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
-/>
+                    <input
+                      type="number"
+                      value={textSize}
+                      onChange={(e) =>
+                        setTextSize(Math.max(8, parseInt(e.target.value) || 12))
+                      }
+                      className="no-spinner w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-center outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
 
-    <button
-      type="button"
-      onClick={() => setTextSize((prev) => Math.min(200, prev + 2))}
-      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-    >
-      +
-    </button>
-  </div>
-  
-</div>
+                    <button
+                      type="button"
+                      onClick={() => setTextSize((prev) => Math.min(200, prev + 2))}
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
-  <label className="text-[10px] font-bold text-zinc-400 uppercase">
-    Cor
-  </label>
+                <label className="text-[10px] font-bold text-zinc-400 uppercase">
+                  Cor
+                </label>
 
-  <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-    <div className="flex items-center gap-3">
-      <input
-        type="color"
-        value={textColor}
-        onChange={(e) => setTextColor(e.target.value)}
-        className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
-        title="Escolher cor do texto"
-      />
+                <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+                      title="Escolher cor do texto"
+                    />
 
-      <div className="flex-1">
-        <p className="text-xs font-semibold text-zinc-600">Cor do texto</p>
-        <div className="mt-1 flex items-center gap-2">
-          <div
-            className="h-5 w-5 rounded-full border border-zinc-300"
-            style={{ backgroundColor: textColor }}
-          />
-          <input
-            type="text"
-            value={textColor}
-            onChange={(e) => setTextColor(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-<div className="space-y-1 mt-3">
-  <label className="text-[10px] font-bold text-zinc-400 uppercase">
-    
-  </label>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-zinc-600">Cor do texto</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div
+                          className="h-5 w-5 rounded-full border border-zinc-300"
+                          style={{ backgroundColor: textColor }}
+                        />
+                        <input
+                          type="text"
+                          value={textColor}
+                          onChange={(e) => setTextColor(e.target.value)}
+                          className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-  <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-    <div className="flex items-center gap-3">
-      
-      {/* COR DA BORDA */}
-      <input
-        type="color"
-        value={textStrokeColor}
-        onChange={(e) => setTextStrokeColor(e.target.value)}
-        className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
-        title="Cor da borda"
-      />
+                <div className="space-y-1 mt-3">
+                  <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={textStrokeColor}
+                        onChange={(e) => setTextStrokeColor(e.target.value)}
+                        className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+                        title="Cor da borda"
+                      />
 
-      {/* CONTROLE */}
-      <div className="flex-1">
-        <p className="text-xs font-semibold text-zinc-600">
-          Cor e espessura da borda
-        </p>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-zinc-600">
+                          Cor e espessura da borda
+                        </p>
 
-        <div className="mt-1 flex items-center gap-2">
-          
-          {/* SLIDER */}
-          <input
-            type="range"
-            min="0"
-            max="8"
-            value={textStroke}
-            onChange={(e) => setTextStroke(parseInt(e.target.value))}
-            className="w-full"
-          />
+                        <div className="mt-1 flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="8"
+                            value={textStroke}
+                            onChange={(e) => setTextStroke(parseInt(e.target.value))}
+                            className="w-full"
+                          />
 
-          {/* VALOR */}
-          <span className="text-xs w-8 text-center text-zinc-600">
-            {textStroke}px
-          </span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                          <span className="text-xs w-8 text-center text-zinc-600">
+                            {textStroke}px
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
-
-          
         </div>
 
         <div className="mt-auto p-6 border-t border-zinc-100 bg-zinc-50/50 space-y-4">
-  <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-    <h3 className="text-sm font-bold text-zinc-800 mb-3">Resumo do pedido</h3>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-zinc-800 mb-3">Resumo do pedido</h3>
 
-    <div className="space-y-2 text-sm text-zinc-600">
-      <p>
-        <strong>Modelo:</strong> {selectedModel?.name || 'Não selecionado'}
-      </p>
-      <p>
-        <strong>Marca:</strong> {selectedBrand || 'Não selecionada'}
-      </p>
-      <p>
-        <strong>Texto:</strong> {customText.trim() || 'Sem texto'}
-      </p>
-      <p>
-        <strong>Imagem:</strong> {image ? 'Adicionada' : 'Não adicionada'}
-      </p>
-    </div>
+            <div className="space-y-2 text-sm text-zinc-600">
+              <p>
+                <strong>Modelo:</strong> {selectedModel?.name || 'Não selecionado'}
+              </p>
+              <p>
+                <strong>Marca:</strong> {selectedBrand || 'Não selecionada'}
+              </p>
+              <p>
+                <strong>Texto:</strong> {customText.trim() || 'Sem texto'}
+              </p>
+              <p>
+                <strong>Imagem:</strong> {image ? 'Adicionada' : 'Não adicionada'}
+              </p>
+            </div>
 
-    <div className="mt-4">
-      <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-2">
-        Quantidade
-      </label>
+            <div className="mt-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-2">
+                Quantidade
+              </label>
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-          className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
-        >
-          -
-        </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                  className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
+                >
+                  -
+                </button>
 
-        <div className="flex-1 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-sm font-bold text-zinc-800">
-          {quantity}
+                <div className="flex-1 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-sm font-bold text-zinc-800">
+                  {quantity}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setQuantity((prev) => prev + 1)}
+                  className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-zinc-100 space-y-1 text-sm">
+              <p className="flex justify-between text-zinc-600">
+                <span>Valor unitário</span>
+                <strong>R$ {unitPrice.toFixed(2)}</strong>
+              </p>
+              <p className="flex justify-between text-zinc-800 text-base font-bold">
+                <span>Total</span>
+                <span>R$ {totalPrice.toFixed(2)}</span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleFinish}
+            disabled={isUploadingOrder || !selectedModel || (!image && !customText.trim())}
+            className={`
+              w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-all
+              ${
+                selectedModel && (image || customText.trim())
+                  ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl scale-[1.02] active:scale-100'
+                  : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+              }
+            `}
+          >
+            <Download className="w-5 h-5" />
+            {isUploadingOrder ? 'Enviando imagens...' : 'Finalizar Pedido'}
+          </button>
+
+          {orderCompleted && (
+            <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm font-medium text-green-700 text-center">
+              Pedido pronto para envio no WhatsApp!
+            </div>
+          )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setQuantity((prev) => prev + 1)}
-          className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-colors"
-        >
-          +
-        </button>
-      </div>
-    </div>
-
-    <div className="mt-4 pt-4 border-t border-zinc-100 space-y-1 text-sm">
-      <p className="flex justify-between text-zinc-600">
-        <span>Valor unitário</span>
-        <strong>R$ {unitPrice.toFixed(2)}</strong>
-      </p>
-      <p className="flex justify-between text-zinc-800 text-base font-bold">
-        <span>Total</span>
-        <span>R$ {totalPrice.toFixed(2)}</span>
-      </p>
-    </div>
-  </div>
-
-  <button
-    onClick={handleFinish}
-   disabled={isUploadingOrder || !selectedModel || (!image && !customText.trim())}
-    className={`
-      w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-all
-      ${selectedModel && (image || customText.trim())
-        ? 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl scale-[1.02] active:scale-100'
-        : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-      }
-    `}
-  >
-    <Download className="w-5 h-5" />
-{isUploadingOrder ? 'Enviando imagens...' : 'Finalizar Pedido'}
-  </button>
-
-  {orderCompleted && (
-    <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm font-medium text-green-700 text-center">
-      Pedido pronto para envio no WhatsApp!
-    </div>
-  )}
-</div>
       </aside>
 
       <main className="flex-1 relative flex items-center justify-center p-8 lg:p-12 overflow-hidden bg-zinc-100">
@@ -1227,356 +1138,188 @@ ${previewImageUrl}
           }}
         />
 
-
         <div className="relative">
-          <motion.div
-          // layout
-          // className="relative w-[340px] h-[680px] rounded-[3.5rem] p-1.5 bg-zinc-300 shadow-2xl overflow-visible"
-          >
-        <div
-  ref={containerRef}
-  data-preview-root="true"
-  className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center rounded-[60px]"
->
-  {/* BASE (col2) - SEMPRE visível */}
-{selectedModel?.col2 && (
-  <img
-  src={selectedModel.col2}
-  data-no-export="true"
-  className="absolute top-0 left-0 w-full h-full object-fill"
-/>
-)}
-
-{/* IMAGEM DO USUÁRIO */}
-{!textOnlyMode && image && (
-  <div
-    ref={imageAreaRef}
-    className="absolute overflow-hidden"
-    style={{
-      top: '3.5%',
-      bottom: '3.5%',
-      left: '8%',
-      right: '8%',
-    }}
-  >
-    <motion.div
-  drag
-  dragConstraints={dragLimits}
-  dragElastic={0}
-  dragMomentum={false}
-  onDragEnd={(_, info) => {
-    setPosition((prev) => {
-      const nextX = prev.x + info.offset.x;
-      const nextY = prev.y + info.offset.y;
-
-      return {
-        x: Math.max(dragLimits.left, Math.min(dragLimits.right, nextX)),
-        y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, nextY)),
-      };
-    });
-  }}
-  style={{
-    x: position.x,
-    y: position.y,
-    scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
-    rotate: imageRotation,
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }}
->
-  <img
-  src={image}
-  data-user-image="true"
-  draggable={false}
-    style={{
-      transform: isMirrored ? 'scaleX(-1)' : 'scaleX(1)',
-    }}
-    className={`pointer-events-none select-none ${
-  effectiveRatio && effectiveRatio >= 0.95
-    ? 'h-full w-auto'
-    : 'w-full h-auto'
-} max-w-none max-h-none`}
-  />
-</motion.div>
-  </div>
-)}
-
-{customText && (
-  <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-    <motion.div
-      drag
-      dragElastic={0}
-      dragMomentum={false}
-      style={{
-        x: textPosition.x,
-        y: textPosition.y,
-        rotate: textRotation,
-        pointerEvents: 'auto',
-        cursor: 'move',
-      }}
-      onDragEnd={(_, info) => {
-        setTextPosition((prev) => ({
-          x: prev.x + info.offset.x,
-          y: prev.y + info.offset.y,
-        }));
-      }}
-      className="relative max-w-[75%] select-none"
-    >
-      <div
-  data-text-box="true"
-  className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent"
->
-<div
-          style={{
-  fontFamily: textFont,
-  color: textColor,
-  fontSize: `${textSize}px`,
-  letterSpacing: `${letterSpacing}px`,
-  fontWeight: isBold ? 700 : 400,
-  fontStyle: isItalic ? 'italic' : 'normal',
-  textDecoration: isUnderline ? 'underline' : 'none',
- textShadow:
-  textStroke > 0
-    ? [
-        `${textStroke}px 0 ${textStrokeColor}`,
-        `-${textStroke}px 0 ${textStrokeColor}`,
-        `0 ${textStroke}px ${textStrokeColor}`,
-        `0 -${textStroke}px ${textStrokeColor}`,
-        `${textStroke}px ${textStroke}px ${textStrokeColor}`,
-        `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
-        `${textStroke}px -${textStroke}px ${textStrokeColor}`,
-        `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
-      ].join(', ')
-    : '0 2px 4px rgba(0,0,0,0.18)',
-  
-  lineHeight: 1.2,
-  textAlign: 'center',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
-}}
-        >
-          {customText}
-        </div>
-
-<div
-  data-no-export="true"
-  className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto"
->
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setTextRotation((prev) => (prev - 45) % 360);
-    }}
-    className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
-    title="Girar Anti-horário"
-  >
-    <RotateCcw className="w-3.5 h-3.5" />
-  </button>
-
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setTextRotation((prev) => (prev + 45) % 360);
-    }}
-    className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
-    title="Girar Horário"
-  >
-    <RotateCw className="w-3.5 h-3.5" />
-  </button>
-</div>
-
-        <motion.div
-          drag
-          dragElastic={0}
-          dragMomentum={false}
-          onDrag={(_, info) => {
-            const delta = info.delta.x + info.delta.y;
-            setTextSize((prev) =>
-              Math.max(8, Math.min(200, prev + delta * 0.25))
-            );
-          }}
-          className="absolute -bottom-2 -right-2 w-4 h-4 bg-green-600 border border-white rounded-sm cursor-nwse-resize"
-        />
-
-        <div data-no-export="true" className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-green-600" />
-<div data-no-export="true" className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-green-600" />
-<div data-no-export="true" className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-green-600" />
-      </div>
-    </motion.div>
-  </div>
-)}
-  {/* MÁSCARA */}
-  {selectedModel?.col3 && (
-    <img
-  src={selectedModel.col3}
-  crossOrigin="anonymous"
-  className="absolute inset-0 w-full h-full pointer-events-none"
-/>
-  )}
-  {/* LOGO PAMDA */}
-<img
-  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-  crossOrigin="anonymous"
-  alt="Pamda"
-  className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
-/>
-</div>
-
-          </motion.div>
-          {/* <div className="absolute -top-1 -left-1 w-16 h-16 bg-white/20 blur-[1px] rounded-tl-[3.5rem] z-50 pointer-events-none border-t-4 border-l-4 border-white/40" />
-            <div className="absolute -top-1 -right-1 w-16 h-16 bg-white/20 blur-[1px] rounded-tr-[3.5rem] z-50 pointer-events-none border-t-4 border-r-4 border-white/40" />
-            <div className="absolute -bottom-1 -left-1 w-16 h-16 bg-white/20 blur-[1px] rounded-bl-[3.5rem] z-50 pointer-events-none border-b-4 border-l-4 border-white/40" />
-            <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-white/20 blur-[1px] rounded-br-[3.5rem] z-50 pointer-events-none border-b-4 border-r-4 border-white/40" />
-
-            <div className="absolute inset-0 border-[14px] border-white/30 rounded-[3.5rem] z-50 pointer-events-none shadow-[inset_0_0_30px_rgba(255,255,255,0.6)]" />
-            <div className="absolute inset-0 border-[2px] border-white/50 rounded-[3.5rem] z-50 pointer-events-none" />
-
+          <motion.div>
             <div
-              className="relative w-full h-full rounded-[3.2rem] overflow-hidden transition-colors duration-500"
-              style={{ backgroundColor: selectedModel?.color || '#1a1a1a' }}
               ref={containerRef}
+              className="relative w-[405px] h-[720px] overflow-hidden flex items-center justify-center rounded-[60px]"
             >
-              {selectedModel?.hasLogo && !image && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-20 z-10">
-                  <Apple className="w-16 h-16 text-black fill-current" />
+              {selectedModel?.col2 && (
+                <img
+                  src={selectedModel.col2}
+                  className="absolute top-0 left-0 w-full h-full object-fill"
+                />
+              )}
+
+              {!textOnlyMode && image && (
+                <div
+                  ref={imageAreaRef}
+                  className="absolute overflow-hidden"
+                  style={{
+                    top: '3.5%',
+                    bottom: '3.5%',
+                    left: '8%',
+                    right: '8%',
+                  }}
+                >
+                  <motion.div
+                    drag
+                    dragConstraints={dragLimits}
+                    dragElastic={0}
+                    dragMomentum={false}
+                    onDragEnd={(_, info) => {
+                      setPosition((prev) => {
+                        const nextX = prev.x + info.offset.x;
+                        const nextY = prev.y + info.offset.y;
+
+                        return {
+                          x: Math.max(dragLimits.left, Math.min(dragLimits.right, nextX)),
+                          y: Math.max(dragLimits.top, Math.min(dragLimits.bottom, nextY)),
+                        };
+                      });
+                    }}
+                    style={{
+                      x: position.x,
+                      y: position.y,
+                      scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
+                      rotate: imageRotation,
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={image}
+                      draggable={false}
+                      style={{
+                        transform: isMirrored ? 'scaleX(-1)' : 'scaleX(1)',
+                      }}
+                      className={`pointer-events-none select-none ${
+                        effectiveRatio && effectiveRatio >= 0.95
+                          ? 'h-full w-auto'
+                          : 'w-full h-auto'
+                      } max-w-none max-h-none`}
+                    />
+                  </motion.div>
                 </div>
               )}
 
-              {selectedModel && <CameraModule layout={selectedModel.cameraLayout} />}
-
-              <div className="absolute inset-0 z-20 overflow-hidden">
-                {!textOnlyMode &&
-                  (image ? (
-                    <motion.div
-                      drag
-                      dragConstraints={dragConstraints}
-                      dragElastic={0}
-                      dragMomentum={false}
-                      animate={{
-                        scale: (zoom / 100) * (imageRotation % 180 !== 0 ? 2 : 1),
-                        rotate: imageRotation,
-                        x: position.x,
-                        y: position.y,
-                      }}
-                      onDrag={(_, info) => {
-                        setPosition((prev) => ({
-                          x: prev.x + info.delta.x,
-                          y: prev.y + info.delta.y,
-                        }));
-                      }}
-                      className="w-full h-full flex items-center justify-center cursor-move"
-                    >
-                      <img
-                        src={image}
-                        alt="Preview"
-                        className={`w-full h-full pointer-events-none select-none object-cover transition-transform duration-300 ${isMirrored ? 'scale-x-[-1]' : 'scale-x-[1]'
-                          }`}
-                        referrerPolicy="no-referrer"
-                      />
-                    </motion.div>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/5 backdrop-blur-[1px]">
-                      <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-4">
-                        <ImageIcon className="w-10 h-10 text-white/20" />
+              {customText && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                  <motion.div
+                    drag
+                    dragElastic={0}
+                    dragMomentum={false}
+                    style={{
+                      x: textPosition.x,
+                      y: textPosition.y,
+                      rotate: textRotation,
+                      pointerEvents: 'auto',
+                      cursor: 'move',
+                    }}
+                    onDragEnd={(_, info) => {
+                      setTextPosition((prev) => ({
+                        x: prev.x + info.offset.x,
+                        y: prev.y + info.offset.y,
+                      }));
+                    }}
+                    className="relative max-w-[75%] select-none"
+                  >
+                    <div className="relative px-3 py-2 border-2 border-green-600/60 rounded-sm bg-transparent">
+                      <div
+                        style={{
+                          fontFamily: textFont,
+                          color: textColor,
+                          fontSize: `${textSize}px`,
+                          letterSpacing: `${letterSpacing}px`,
+                          fontWeight: isBold ? 700 : 400,
+                          fontStyle: isItalic ? 'italic' : 'normal',
+                          textDecoration: isUnderline ? 'underline' : 'none',
+                          textShadow:
+                            textStroke > 0
+                              ? [
+                                  `${textStroke}px 0 ${textStrokeColor}`,
+                                  `-${textStroke}px 0 ${textStrokeColor}`,
+                                  `0 ${textStroke}px ${textStrokeColor}`,
+                                  `0 -${textStroke}px ${textStrokeColor}`,
+                                  `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                                  `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                                  `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                                  `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                                ].join(', ')
+                              : '0 2px 4px rgba(0,0,0,0.18)',
+                          lineHeight: 1.2,
+                          textAlign: 'center',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {customText}
                       </div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
-                        Área de Impressão
-                      </p>
-                    </div>
-                  ))}
 
-                {customText && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-                    <motion.div
-                      drag
-                      dragConstraints={containerRef}
-                      dragElastic={0}
-                      dragMomentum={false}
-                      style={{
-                        x: textPosition.x,
-                        y: textPosition.y,
-                        rotate: textRotation,
-                        pointerEvents: 'auto',
-                        cursor: 'move',
-                      }}
-                      onDragEnd={(_, info) => {
-                        setTextPosition((prev) => ({
-                          x: prev.x + info.offset.x,
-                          y: prev.y + info.offset.y,
-                        }));
-                      }}
-                      className="select-none whitespace-nowrap group"
-                    >
-                      <div className="relative p-3 border-2 border-blue-500/50 rounded-sm transition-colors max-w-[280px]">
-                        <div
-                          style={{
-                            fontFamily: textFont,
-                            color: textColor,
-                            fontSize: `${textSize}px`,
-                            fontWeight: 'bold',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                            lineHeight: 1.2,
-                            textAlign: 'center',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            hyphens: 'auto',
+                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTextRotation((prev) => (prev - 45) % 360);
                           }}
-                          className="flex items-center justify-center"
+                          className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
+                          title="Girar Anti-horário"
                         >
-                          {customText}
-                          <span className="inline-block w-[2px] h-[1em] bg-current ml-0.5 animate-blink" />
-                        </div>
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
 
-                        <motion.div
-                          drag
-                          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                          dragElastic={0}
-                          onDrag={(_, info) => {
-                            const delta = info.delta.x + info.delta.y;
-                            setTextSize((prev) => Math.max(8, prev + delta * 0.5));
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTextRotation((prev) => (prev + 45) % 360);
                           }}
-                          className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-blue-500 border border-white shadow-sm cursor-nwse-resize z-50"
-                        />
-
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTextRotation((prev) => (prev - 45) % 360);
-                            }}
-                            className="p-1.5 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors"
-                            title="Girar Anti-horário"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTextRotation((prev) => (prev + 45) % 360);
-                            }}
-                            className="p-1.5 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors"
-                            title="Girar Horário"
-                          >
-                            <RotateCw className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-blue-500" />
-                        <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-blue-500" />
-                        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-blue-500" />
+                          className="p-1.5 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-600 transition-colors"
+                          title="Girar Horário"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    </motion.div>
-                  </div>
-                )}
-              </div>
 
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-white/20 z-40 pointer-events-none" />
-              <div className="absolute top-0 left-1/4 w-1/2 h-full bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 z-40 pointer-events-none" />
+                      <motion.div
+                        drag
+                        dragElastic={0}
+                        dragMomentum={false}
+                        onDrag={(_, info) => {
+                          const delta = info.delta.x + info.delta.y;
+                          setTextSize((prev) =>
+                            Math.max(8, Math.min(200, prev + delta * 0.25))
+                          );
+                        }}
+                        className="absolute -bottom-2 -right-2 w-4 h-4 bg-green-600 border border-white rounded-sm cursor-nwse-resize"
+                      />
+
+                      <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-green-600" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-green-600" />
+                      <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-green-600" />
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
+              {selectedModel?.col3 && (
+                <img
+                  src={selectedModel.col3}
+                  crossOrigin="anonymous"
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                />
+              )}
+
+              <img
+                src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+                crossOrigin="anonymous"
+                alt="Pamda"
+                className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
+              />
             </div>
-          */}
+          </motion.div>
 
           <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 text-center">
             <p className="text-sm font-bold text-zinc-900">
@@ -1597,6 +1340,137 @@ ${previewImageUrl}
               Arraste ou use as setas para ajustar
             </motion.div>
           )}
+        </div>
+
+        <div
+          style={{
+            position: 'fixed',
+            left: '-99999px',
+            top: '0',
+            width: '405px',
+            height: '720px',
+            opacity: 1,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+            zIndex: -1,
+          }}
+        >
+          <div
+            ref={exportRef}
+            style={{
+              position: 'relative',
+              width: '405px',
+              height: '720px',
+              overflow: 'hidden',
+              background: 'transparent',
+            }}
+          >
+            {!textOnlyMode && image && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '3.5%',
+                  bottom: '3.5%',
+                  left: '8%',
+                  right: '8%',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: exportImageTransform,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt="Arte do cliente"
+                    style={{
+                      ...(effectiveRatio && effectiveRatio >= 0.95
+                        ? { height: '100%', width: 'auto' }
+                        : { width: '100%', height: 'auto' }),
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {customText && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    transform: `translate(${textPosition.x}px, ${textPosition.y}px) rotate(${textRotation}deg)`,
+                    maxWidth: '75%',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: textFont,
+                      color: textColor,
+                      fontSize: `${textSize}px`,
+                      letterSpacing: `${letterSpacing}px`,
+                      fontWeight: isBold ? 700 : 400,
+                      fontStyle: isItalic ? 'italic' : 'normal',
+                      textDecoration: isUnderline ? 'underline' : 'none',
+                      textShadow:
+                        textStroke > 0
+                          ? [
+                              `${textStroke}px 0 ${textStrokeColor}`,
+                              `-${textStroke}px 0 ${textStrokeColor}`,
+                              `0 ${textStroke}px ${textStrokeColor}`,
+                              `0 -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `${textStroke}px -${textStroke}px ${textStrokeColor}`,
+                              `-${textStroke}px ${textStroke}px ${textStrokeColor}`,
+                            ].join(', ')
+                          : '0 2px 4px rgba(0,0,0,0.18)',
+                      lineHeight: 1.2,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {customText}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedModel?.col3 && (
+              <img
+                src={selectedModel.col3}
+                crossOrigin="anonymous"
+                alt="Máscara"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 30,
+                }}
+              />
+            )}
+          </div>
         </div>
       </main>
     </div>
