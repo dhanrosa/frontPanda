@@ -553,7 +553,7 @@ export default function App() {
     };
   };
 
-  const unitPrice = 54.9;
+  const unitPrice = 25.00;
   const totalPrice = unitPrice * quantity;
 
   const handleFinish = async () => {
@@ -1404,7 +1404,7 @@ ${previewImageUrl}
                 src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
                 crossOrigin="anonymous"
                 alt="Pamda"
-                className="absolute top-160 right-43 w-17 opacity-90 z-50 pointer-events-none"
+                className="absolute top-157 right-43 w-17 opacity-90 z-50 pointer-events-none"
               />
             </div>
           </motion.div>
