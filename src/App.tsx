@@ -2342,7 +2342,7 @@ ${previewImageUrl}
                       className="mt-2.5 rounded-2xl bg-white/80 px-4 text-center text-sm text-zinc-500"
                       style={{ paddingTop: `${viewport.height < 720 ? 6 : 8}px`, paddingBottom: `${viewport.height < 720 ? 6 : 8}px` }}
                     >
-                      {image || customText.trim() ? 'Use foto e texto com foco total no preview.' : 'Adicione uma foto, um texto ou os dois para continuar.'}
+                      {image || customText.trim() ? 'Use foto e texto com foco total no preview.' : 'Adicione uma foto, um texto ou os dois.'}
                     </div>
                     {image && (
                       <button type="button" onClick={clearImage} className="mx-auto mt-2.5 flex items-center gap-2 text-sm font-semibold text-red-600">
