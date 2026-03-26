@@ -695,7 +695,7 @@ export default function App() {
     };
   };
 
-  const unitPrice = 54.9;
+  const unitPrice = 25.00;
   const totalPrice = unitPrice * quantity;
 
   const handleFinish = async () => {
@@ -1273,7 +1273,26 @@ ${previewImageUrl}
                     </>
                   )}
                 </div>
+<<<<<<< HEAD
               </motion.div>
+=======
+              )}
+
+              {selectedModel?.col3 && (
+                <img
+                  src={selectedModel.col3}
+                  crossOrigin="anonymous"
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                />
+              )}
+
+              <img
+                src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+                crossOrigin="anonymous"
+                alt="Pamda"
+                className="absolute top-157 right-43 w-17 opacity-90 z-50 pointer-events-none"
+              />
+>>>>>>> 71b73104a5b91c047602c600a9585e2ac88217e4
             </div>
           )}
 
