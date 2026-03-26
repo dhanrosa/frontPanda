@@ -2,8 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import heic2any from 'heic2any';
 import html2canvas from 'html2canvas-pro';
+import heic2any from 'heic2any';
 import './image.css';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -74,6 +74,12 @@ const TEXT_COLOR_PRESETS = [
 const MAX_CUSTOM_TEXT_LENGTH = 80;
 const EXPORT_WIDTH = 405;
 const EXPORT_HEIGHT = 720;
+const PREVIEW_ASPECT_RATIO = EXPORT_WIDTH / EXPORT_HEIGHT;
+const MOBILE_LAYOUT_MAX_WIDTH = 1180;
+const MOBILE_LAYOUT_MIN_HEIGHT = 820;
+const MOBILE_HEADER_ESTIMATED_HEIGHT = 84;
+const MOBILE_BOTTOM_BAR_ESTIMATED_HEIGHT = 108;
+const MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT = 48;
 
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
@@ -127,13 +133,23 @@ export default function App() {
   const [isBrandSearchMode, setIsBrandSearchMode] = useState(false);
   const [isMobileImageEditing, setIsMobileImageEditing] = useState(false);
   const [isMobileTextModalOpen, setIsMobileTextModalOpen] = useState(false);
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
   const [isMobileLayout, setIsMobileLayout] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+    typeof window !== 'undefined'
+      ? window.innerWidth < MOBILE_LAYOUT_MAX_WIDTH ||
+        window.innerHeight < MOBILE_LAYOUT_MIN_HEIGHT
+      : false
   );
   const [previewRenderSize, setPreviewRenderSize] = useState({
     width: EXPORT_WIDTH,
     height: EXPORT_HEIGHT,
   });
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
 
   const brands = useMemo(() => {
     return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
@@ -261,13 +277,33 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileLayout(window.innerWidth <= 768);
+      const visualViewport = window.visualViewport;
+      const nextViewport = {
+        width: Math.round(visualViewport?.width ?? window.innerWidth),
+        height: Math.round(visualViewport?.height ?? window.innerHeight),
+      };
+      const isCoarsePointer =
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches;
+
+      setViewport(nextViewport);
+      setIsMobileLayout(
+        nextViewport.width < MOBILE_LAYOUT_MAX_WIDTH ||
+          nextViewport.height < MOBILE_LAYOUT_MIN_HEIGHT ||
+          isCoarsePointer
+      );
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('scroll', handleResize);
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
   }, []);
 
   useEffect(() => {
@@ -698,6 +734,10 @@ export default function App() {
   const unitPrice = 25.00;
   const totalPrice = unitPrice * quantity;
 
+  const navigateToWhatsApp = (whatsappUrl: string) => {
+    window.location.href = whatsappUrl;
+  };
+
   const handleFinish = async () => {
     try {
       if (!selectedModel) {
@@ -748,7 +788,7 @@ ${previewImageUrl}
       )}`;
 
       setOrderCompleted(true);
-      window.open(whatsappUrl, '_blank');
+      navigateToWhatsApp(whatsappUrl);
     } catch (error) {
       console.error(error);
       const errorMessage =
@@ -1122,16 +1162,51 @@ ${previewImageUrl}
     </div>
   );
 
+  const getPreviewFrameStyle = (mobile = false): React.CSSProperties => {
+    if (mobile) {
+      const horizontalPadding = clamp(viewport.width * 0.12, 24, 52);
+      const maxWidthFromViewport = Math.max(190, viewport.width - horizontalPadding * 2);
+      const reservedHeight =
+        MOBILE_HEADER_ESTIMATED_HEIGHT +
+        MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT +
+        MOBILE_BOTTOM_BAR_ESTIMATED_HEIGHT +
+        (currentStep === 3 ? 250 : currentStep === 4 ? 210 : 180);
+      const maxHeight = Math.max(220, viewport.height - reservedHeight);
+      const width = Math.min(
+        clamp(viewport.width * 0.58, 190, 236),
+        maxWidthFromViewport,
+        maxHeight * PREVIEW_ASPECT_RATIO
+      );
+
+      return {
+        width: `${width}px`,
+        height: `${width / PREVIEW_ASPECT_RATIO}px`,
+      };
+    }
+
+    const maxWidthFromViewport = Math.max(320, viewport.width * 0.34);
+    const maxHeight = Math.max(520, viewport.height - 220);
+    const width = Math.min(
+      EXPORT_WIDTH,
+      maxWidthFromViewport,
+      maxHeight * PREVIEW_ASPECT_RATIO
+    );
+
+    return {
+      width: `${width}px`,
+      height: `${width / PREVIEW_ASPECT_RATIO}px`,
+    };
+  };
+
   const renderPhonePreview = (mobile = false, interactive = true) => (
     <div className="relative">
       <motion.div>
         <div
           ref={containerRef}
-          className={`relative overflow-hidden rounded-[48px] flex items-center justify-center ${
-            mobile
-              ? 'mx-auto h-[360px] w-[202px] sm:h-[390px] sm:w-[220px]'
-              : 'h-[720px] w-[405px] rounded-[60px]'
+          className={`relative flex items-center justify-center overflow-hidden ${
+            mobile ? 'mx-auto rounded-[48px]' : 'rounded-[60px]'
           }`}
+          style={getPreviewFrameStyle(mobile)}
         >
           {selectedModel?.col2 && (
             <img
@@ -1401,7 +1476,7 @@ ${previewImageUrl}
     onReset?: () => void;
   }) => (
     <div className="sticky bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2">
-      <div className="mx-auto flex max-w-md items-center gap-2 rounded-[24px] border border-white/80 bg-white/92 p-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-[680px] items-center gap-2 rounded-[24px] border border-white/80 bg-white/92 p-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md">
         <button
           type="button"
           onClick={prevStep}
@@ -1532,7 +1607,10 @@ ${previewImageUrl}
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4">
-        <div className="w-full max-w-md rounded-[28px] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.24)]">
+        <div
+          className="w-full max-w-[680px] overflow-y-auto rounded-[28px] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+          style={{ maxHeight: `${Math.max(360, viewport.height - 32)}px` }}
+        >
           <div className="mb-2 flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">
@@ -1731,6 +1809,83 @@ ${previewImageUrl}
                     placeholder="#000000"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-400">
+                    Borda
+                  </label>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTextStroke((prev) => Math.max(0, prev - 1))}
+                      className="rounded-xl bg-white px-3 py-2 text-xs"
+                    >
+                      -
+                    </button>
+                    <span className="w-12 text-center text-sm font-semibold text-zinc-700">
+                      {textStroke}px
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTextStroke((prev) => Math.min(8, prev + 1))}
+                      className="rounded-xl bg-white px-3 py-2 text-xs"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="min-w-[120px] rounded-2xl bg-white px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-400">
+                    Cor da borda
+                  </p>
+                  <div
+                    className="mt-2 h-10 rounded-xl border border-zinc-200"
+                    style={{ backgroundColor: textStrokeColor }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-2">
+                <input
+                  type="color"
+                  value={textStrokeColor}
+                  onChange={(e) => setTextStrokeColor(e.target.value)}
+                  className="h-10 w-10 cursor-pointer rounded-xl border border-zinc-200 bg-transparent p-1"
+                  title="Escolher cor da borda"
+                />
+                <span className="text-xs font-medium text-zinc-500">Cor personalizada da borda</span>
+              </div>
+              <div className="mt-2.5 flex items-center gap-2">
+                <div
+                  className="h-9 w-9 shrink-0 rounded-xl border border-zinc-200"
+                  style={{ backgroundColor: textStrokeColor }}
+                />
+                <input
+                  type="text"
+                  value={textStrokeColor}
+                  onChange={(e) => setTextStrokeColor(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:ring-2 focus:ring-[#435446]"
+                  placeholder="#000000"
+                />
+              </div>
+              <div className="mt-3 rounded-2xl border border-zinc-200 bg-white px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-zinc-500">Espessura da borda</span>
+                  <span className="text-xs font-semibold text-zinc-700">{textStroke}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="8"
+                  value={textStroke}
+                  onChange={(e) => setTextStroke(parseInt(e.target.value, 10))}
+                  className="mt-3 w-full"
+                />
               </div>
             </div>
 
@@ -1945,24 +2100,24 @@ ${previewImageUrl}
   return (
     <div className="min-h-screen bg-zinc-50 font-sans">
       {isMobileLayout ? (
-        <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#e7e2d7]">
+        <div
+          className="flex flex-col overflow-hidden bg-[#e7e2d7]"
+          style={{ height: `${viewport.height}px`, minHeight: `${viewport.height}px` }}
+        >
           <header className="sticky top-0 z-40 border-b border-zinc-300/70 bg-[#cdc5b8]/95 px-4 py-3 backdrop-blur">
-            <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+            <div className="mx-auto flex w-full max-w-[680px] flex-col items-center justify-center gap-2 text-center">
               <img
                 src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
                 alt="Logo Pamda Cases"
                 className="h-8 w-auto"
               />
-              <div className="text-right">
-                <p className="font-lexend text-xs font-bold uppercase tracking-[0.24em] text-zinc-700">
-                  Pamda Cases
-                </p>
-                <p className="text-[10px] text-zinc-500">Personalizacao guiada</p>
-              </div>
+              <p className="font-lexend text-sm font-bold text-[#435446]">
+                Sua capinha, do seu jeito!
+              </p>
             </div>
           </header>
 
-          <div className="mx-auto flex h-full w-full max-w-md flex-1 flex-col overflow-hidden px-4 pb-4 pt-4">
+          <div className="mx-auto flex h-full w-full max-w-[680px] flex-1 flex-col overflow-hidden px-4 pb-4 pt-4">
             <input
               type="file"
               ref={mobileFileInputRef}
@@ -2124,17 +2279,37 @@ ${previewImageUrl}
 
             {currentStep === 3 && (
               <>
-                <section className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden pb-24">
-                  <div className="rounded-[34px] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(240,238,231,0.98)_100%)] px-4 pb-5 pt-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <section
+                  className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden"
+                  style={{ paddingBottom: `${viewport.height < 720 ? 88 : 96}px` }}
+                >
+                  <div
+                    className="rounded-[34px] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(240,238,231,0.98)_100%)] shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
+                    style={{
+                      paddingTop: `${viewport.height < 720 ? 12 : 16}px`,
+                      paddingBottom: `${viewport.height < 720 ? 14 : 20}px`,
+                      paddingLeft: `${viewport.width < 360 ? 12 : 16}px`,
+                      paddingRight: `${viewport.width < 360 ? 12 : 16}px`,
+                    }}
+                  >
                     <div className="text-center">
                       <p className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">{selectedBrand}</p>
                       <h3 className="mt-1 text-base font-semibold text-zinc-900">{selectedModel?.name}</h3>
                     </div>
-                    <div className="relative mx-auto mt-2 flex max-w-[320px] justify-center px-12">
+                    <div
+                      className="relative mx-auto mt-2 flex w-full max-w-[420px] justify-center"
+                      style={{
+                        paddingLeft: `${viewport.width < 360 ? 28 : 48}px`,
+                        paddingRight: `${viewport.width < 360 ? 28 : 48}px`,
+                      }}
+                    >
                       {renderPhonePreview(true)}
                       {renderMobileImageControls()}
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div
+                      className="mt-3 grid grid-cols-2"
+                      style={{ gap: `${viewport.height < 720 ? 10 : 12}px` }}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -2163,7 +2338,10 @@ ${previewImageUrl}
                         Texto
                       </button>
                     </div>
-                    <div className="mt-2.5 rounded-2xl bg-white/80 px-4 py-2 text-center text-sm text-zinc-500">
+                    <div
+                      className="mt-2.5 rounded-2xl bg-white/80 px-4 text-center text-sm text-zinc-500"
+                      style={{ paddingTop: `${viewport.height < 720 ? 6 : 8}px`, paddingBottom: `${viewport.height < 720 ? 6 : 8}px` }}
+                    >
                       {image || customText.trim() ? 'Use foto e texto com foco total no preview.' : 'Adicione uma foto, um texto ou os dois para continuar.'}
                     </div>
                     {image && (
@@ -2207,8 +2385,8 @@ ${previewImageUrl}
           </div>
         </div>
       ) : (
-        <div className="flex min-h-screen flex-col lg:flex-row">
-          <aside className="z-10 flex max-h-screen w-full flex-col overflow-y-auto border-b border-zinc-200 bg-bamboo lg:w-96 lg:border-r lg:border-b-0">
+        <div className="flex min-h-[100dvh] flex-col xl:flex-row">
+          <aside className="z-10 flex w-full flex-col overflow-y-auto border-b border-zinc-200 bg-bamboo xl:max-h-[100dvh] xl:w-96 xl:border-b-0 xl:border-r">
             <div className="border-b border-zinc-100/50 p-8 text-center">
               <div className="mb-4">
                 <img
@@ -2217,7 +2395,7 @@ ${previewImageUrl}
                   className="mx-auto h-auto w-48"
                 />
               </div>
-              <h2 className="font-lexend text-lg font-bold text-zinc-800">
+              <h2 className="font-lexend text-xs font-bold text-zinc-800">
                 Sua capinha, do seu jeito!
               </h2>
             </div>
@@ -2623,7 +2801,7 @@ ${previewImageUrl}
             </div>
           </aside>
 
-          <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-zinc-100 p-8 lg:p-12">
+          <main className="relative flex min-h-[48vh] flex-1 items-center justify-center overflow-hidden bg-zinc-100 p-6 md:p-8 xl:min-h-[100dvh] xl:p-12">
             <div
               className="pointer-events-none absolute inset-0 opacity-[0.03]"
               style={{
