@@ -2104,14 +2104,14 @@ ${previewImageUrl}
           className="flex flex-col overflow-hidden bg-[#e7e2d7]"
           style={{ height: `${viewport.height}px`, minHeight: `${viewport.height}px` }}
         >
-          <header className="sticky top-0 z-40 border-b border-zinc-300/70 bg-[#cdc5b8]/95 px-4 py-3 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-[680px] flex-col items-center justify-center gap-2 text-center">
+          <header className="sticky top-0 z-40 border-b border-[#6d7b6b]/15 bg-[#e4ebe1]/95 px-4 py-2 backdrop-blur">
+            <div className="mx-auto flex w-full max-w-[680px] flex-col items-center justify-center gap-1 text-center">
               <img
                 src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
                 alt="Logo Pamda Cases"
-                className="h-8 w-auto"
+                className="h-[42px] w-auto"
               />
-              <p className="font-lexend text-sm font-bold text-[#435446]">
+              <p className="font-lexend text-[8px] font-bold text-[#435446]">
                 Sua capinha, do seu jeito!
               </p>
             </div>
@@ -2392,10 +2392,10 @@ ${previewImageUrl}
                 <img
                   src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
                   alt="Logo Pamda Cases"
-                  className="mx-auto h-auto w-48"
+                  className="mx-auto h-auto w-[250px]"
                 />
               </div>
-              <h2 className="font-lexend text-xs font-bold text-zinc-800">
+              <h2 className="font-lexend text-[7px] font-bold text-zinc-800">
                 Sua capinha, do seu jeito!
               </h2>
             </div>
