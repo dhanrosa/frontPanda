@@ -207,6 +207,28 @@ export default function App() {
     return Math.max(0.6, Number(((fontSize / 24) * textStroke).toFixed(2)));
   };
 
+  const buildExternalTextShadow = (strokeSize: number, strokeColor: string) => {
+    if (strokeSize <= 0) {
+      return '0 2px 4px rgba(0,0,0,0.18)';
+    }
+
+    const layers: string[] = [];
+    const maxRadius = Math.max(1, Math.ceil(strokeSize));
+    const angleStep = 20;
+
+    for (let radius = 1; radius <= maxRadius; radius += 1) {
+      for (let angle = 0; angle < 360; angle += angleStep) {
+        const radians = (angle * Math.PI) / 180;
+        const x = Number((Math.cos(radians) * radius).toFixed(2));
+        const y = Number((Math.sin(radians) * radius).toFixed(2));
+        layers.push(`${x}px ${y}px 0 ${strokeColor}`);
+      }
+    }
+
+    layers.push('0 2px 4px rgba(0,0,0,0.18)');
+    return layers.join(', ');
+  };
+
   const getDirectImageUrl = (url: string) => {
     if (!url || typeof url !== 'string') return '';
     const trimmedUrl = url.trim();
@@ -1039,11 +1061,9 @@ ${previewImageUrl}
       fontWeight: isBold ? 700 : 400,
       fontStyle: isItalic ? 'italic' : 'normal',
       textDecoration: isUnderline ? 'underline' : 'none',
-      WebkitTextStroke:
-        scaledStroke > 0 ? `${scaledStroke}px ${textStrokeColor}` : undefined,
-      textStroke:
-        scaledStroke > 0 ? `${scaledStroke}px ${textStrokeColor}` : undefined,
-      textShadow: scaledStroke === 0 ? '0 2px 4px rgba(0,0,0,0.18)' : 'none',
+      WebkitTextStroke: undefined,
+      textStroke: undefined,
+      textShadow: buildExternalTextShadow(scaledStroke, textStrokeColor),
       lineHeight: 1.2,
       textAlign: 'center',
       whiteSpace: preservesManualLineBreaks ? 'pre-wrap' : 'pre',
@@ -2817,7 +2837,7 @@ ${previewImageUrl}
                   className="mx-auto h-auto w-[250px]"
                 />
               </div>
-              <h2 className="font-lexend text-[7px] font-bold text-zinc-800">
+              <h2 className="font-lexend text-[17px] font-bold text-zinc-800">
                 Sua capinha, do seu jeito!
               </h2>
             </div>
