@@ -26,6 +26,9 @@ import {
   Italic,
   Underline,
   Check,
+  ShoppingCart,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { PhoneModel } from './constants';
@@ -81,6 +84,27 @@ const MOBILE_HEADER_ESTIMATED_HEIGHT = 84;
 const MOBILE_BOTTOM_BAR_ESTIMATED_HEIGHT = 108;
 const MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT = 48;
 
+type ItemCarrinho = {
+  id: string;
+  marca: string;
+  modelo: string;
+  quantidade: number;
+  texto?: string;
+  corTexto?: string;
+  fonteTexto?: string;
+  tamanhoTexto?: number;
+  espacamentoTexto?: number;
+  negrito?: boolean;
+  italico?: boolean;
+  sublinhado?: boolean;
+  imagemPreviewUrl?: string;
+  imagemArteFinalUrl?: string;
+  previewLocal?: string;
+  resumo?: string;
+  temImagem: boolean;
+  modoSomenteTexto: boolean;
+};
+
 export default function App() {
   const [image, setImage] = useState<string | null>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -126,6 +150,8 @@ export default function App() {
 
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
@@ -728,17 +754,214 @@ export default function App() {
     return {
       productionImageUrl,
       previewImageUrl,
+      previewBlob,
     };
   };
 
   const unitPrice = 25.00;
   const totalPrice = unitPrice * quantity;
+  const quantidadeItensCarrinho = useMemo(
+    () => carrinho.reduce((total, item) => total + item.quantidade, 0),
+    [carrinho]
+  );
 
   const navigateToWhatsApp = (whatsappUrl: string) => {
     window.location.href = whatsappUrl;
   };
 
+  const blobParaDataUrl = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result || ''));
+      reader.onerror = () =>
+        reject(new Error('Nao foi possivel gerar a previa local do item.'));
+      reader.readAsDataURL(blob);
+    });
+
+  const validarItemAtual = () => {
+    if (!selectedModel) {
+      alert('Selecione o modelo do celular.');
+      return false;
+    }
+
+    if (!image && !customText.trim()) {
+      alert('Envie uma imagem ou adicione um texto para personalizar.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const gerarResumoItemAtual = () => {
+    const partes: string[] = [];
+
+    partes.push(customText.trim() ? `Texto: ${customText.trim()}` : 'Sem texto');
+    partes.push(image ? 'Com imagem personalizada' : 'Sem imagem');
+
+    if (textOnlyMode) {
+      partes.push('Modo somente texto ativo');
+    }
+
+    return partes.join(' • ');
+  };
+
+  const montarItemCarrinhoAtual = async (): Promise<ItemCarrinho> => {
+    if (!selectedModel) {
+      throw new Error('Selecione o modelo do celular.');
+    }
+
+    const { productionImageUrl, previewImageUrl, previewBlob } = await uploadOrderAssets();
+    const previewLocal = await blobParaDataUrl(previewBlob);
+
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      marca: selectedBrand,
+      modelo: selectedModel.name,
+      quantidade: quantity,
+      texto: customText.trim() || undefined,
+      corTexto: customText.trim() ? textColor : undefined,
+      fonteTexto: customText.trim() ? textFont : undefined,
+      tamanhoTexto: customText.trim() ? textSize : undefined,
+      espacamentoTexto: customText.trim() ? letterSpacing : undefined,
+      negrito: customText.trim() ? isBold : undefined,
+      italico: customText.trim() ? isItalic : undefined,
+      sublinhado: customText.trim() ? isUnderline : undefined,
+      imagemPreviewUrl: previewImageUrl,
+      imagemArteFinalUrl: productionImageUrl,
+      previewLocal,
+      resumo: gerarResumoItemAtual(),
+      temImagem: Boolean(image),
+      modoSomenteTexto: textOnlyMode,
+    };
+  };
+
+  const resetarEditorParaNovoItem = () => {
+    clearImage();
+    clearText();
+    resetTransform();
+    setQuantity(1);
+    setOrderCompleted(false);
+    setSearchQuery('');
+    setMobileBrandSearchQuery('');
+    setIsMobileSearchActive(false);
+    setIsBrandSearchMode(false);
+    setIsMobileImageEditing(false);
+    setIsMobileTextModalOpen(false);
+  };
+
+  const voltarParaPrimeiraEtapa = () => {
+    setCurrentStep(1);
+  };
+
+  const adicionarItemAoCarrinho = async () => {
+    if (!validarItemAtual()) return;
+
+    try {
+      setIsUploadingOrder(true);
+      const novoItem = await montarItemCarrinhoAtual();
+      setCarrinho((prev) => [...prev, novoItem]);
+      resetarEditorParaNovoItem();
+      voltarParaPrimeiraEtapa();
+      setCarrinhoAberto(true);
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Nao foi possivel adicionar o item ao carrinho.'
+      );
+    } finally {
+      setIsUploadingOrder(false);
+    }
+  };
+
+  const removerItemDoCarrinho = (id: string) => {
+    setCarrinho((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const limparCarrinho = () => {
+    setCarrinho([]);
+  };
+
+  const gerarMensagemWhatsAppCarrinho = (itens: ItemCarrinho[]) => {
+    const totalQuantidade = itens.reduce((total, item) => total + item.quantidade, 0);
+    const totalGeral = itens.reduce(
+      (total, item) => total + item.quantidade * unitPrice,
+      0
+    );
+
+    const itensFormatados = itens
+      .map((item, index) => {
+        const linhas = [
+          `*Item ${index + 1}*`,
+          `- Marca: ${item.marca}`,
+          `- Modelo: ${item.modelo}`,
+          `- Quantidade: ${item.quantidade}`,
+          `- Texto: ${item.texto || 'Sem texto'}`,
+          `- Observacoes: ${item.resumo || 'Sem observacoes adicionais'}`,
+        ];
+
+        if (item.texto) {
+          linhas.push(`- Fonte: ${item.fonteTexto || 'Nao informada'}`);
+          linhas.push(`- Cor do texto: ${item.corTexto || 'Nao informada'}`);
+          linhas.push(`- Tamanho do texto: ${item.tamanhoTexto || 0}px`);
+        }
+
+        if (item.imagemArteFinalUrl) {
+          linhas.push(`- Arte final: ${item.imagemArteFinalUrl}`);
+        }
+
+        if (item.imagemPreviewUrl) {
+          linhas.push(`- Previa: ${item.imagemPreviewUrl}`);
+        }
+
+        return linhas.join('\n');
+      })
+      .join('\n\n');
+
+    return `*Pedido de Capinhas Personalizadas - Pamda Cases*\n\n${itensFormatados}\n\n*Resumo*\n- Total de modelos: ${itens.length}\n- Total de unidades: ${totalQuantidade}\n- Valor estimado: R$ ${totalGeral.toFixed(2)}`;
+  };
+
+  const finalizarPedidoCarrinho = async () => {
+    const temItemAtual = Boolean(selectedModel && (image || customText.trim()));
+
+    if (!carrinho.length && !temItemAtual) {
+      alert('Adicione ao menos uma capinha ao carrinho ou conclua a personalizacao atual.');
+      return;
+    }
+
+    try {
+      setIsUploadingOrder(true);
+
+      const itensParaFinalizar = [...carrinho];
+
+      if (temItemAtual) {
+        if (!validarItemAtual()) return;
+        const itemAtual = await montarItemCarrinhoAtual();
+        itensParaFinalizar.push(itemAtual);
+      }
+
+      const message = gerarMensagemWhatsAppCarrinho(itensParaFinalizar);
+      const whatsappUrl = `https://wa.me/5541933003156?text=${encodeURIComponent(
+        message
+      )}`;
+
+      setOrderCompleted(true);
+      navigateToWhatsApp(whatsappUrl);
+    } catch (error) {
+      console.error(error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Nao foi possivel finalizar o pedido.';
+      alert(errorMessage);
+    } finally {
+      setIsUploadingOrder(false);
+    }
+  };
+
   const handleFinish = async () => {
+    return finalizarPedidoCarrinho();
     try {
       if (!selectedModel) {
         alert('Selecione o modelo do celular.');
@@ -1212,6 +1435,7 @@ ${previewImageUrl}
             <img
               src={selectedModel.col2}
               className="absolute top-0 left-0 h-full w-full object-fill"
+              style={{ zIndex: 1 }}
             />
           )}
 
@@ -1224,6 +1448,7 @@ ${previewImageUrl}
                 bottom: '3.5%',
                 left: '8%',
                 right: '8%',
+                zIndex: 10,
               }}
             >
               <motion.div
@@ -1357,6 +1582,7 @@ ${previewImageUrl}
               src={selectedModel.col3}
               crossOrigin="anonymous"
               className="absolute inset-0 h-full w-full pointer-events-none"
+              style={{ zIndex: 30 }}
             />
           )}
 
@@ -1455,6 +1681,169 @@ ${previewImageUrl}
         </p>
       </div>
     </div>
+  );
+
+  const renderBotaoCarrinho = (mobile = false) => (
+    <button
+      type="button"
+      onClick={() => setCarrinhoAberto(true)}
+      className={`relative inline-flex items-center justify-center gap-2 rounded-full border transition-all ${
+        mobile
+          ? 'h-11 min-w-11 border-[#6d7b6b]/15 bg-white/85 px-3 text-[#435446] shadow-sm'
+          : 'h-11 border-zinc-200 bg-white px-4 text-zinc-700 shadow-sm hover:bg-zinc-50'
+      }`}
+      aria-label="Abrir carrinho"
+    >
+      <ShoppingCart className="h-4 w-4" />
+      {!mobile && <span className="text-sm font-semibold">Carrinho</span>}
+      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#435446] px-1 text-[10px] font-bold text-white">
+        {carrinho.length}
+      </span>
+    </button>
+  );
+
+  const renderPainelCarrinho = () => (
+    <AnimatePresence>
+      {carrinhoAberto && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[90] bg-zinc-950/35 backdrop-blur-[2px]"
+          onClick={() => setCarrinhoAberto(false)}
+        >
+          <motion.aside
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="ml-auto flex h-full w-full max-w-[420px] flex-col bg-[#f6f3ee] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#6d7b6b]/15 px-5 py-4">
+              <div>
+                <h3 className="font-lexend text-base font-bold text-[#435446]">Carrinho</h3>
+                <p className="text-xs text-zinc-500">
+                  {carrinho.length} modelo(s) • {quantidadeItensCarrinho} unidade(s)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCarrinhoAberto(false)}
+                className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500"
+                aria-label="Fechar carrinho"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {carrinho.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-zinc-300 bg-white/70 px-5 py-8 text-center">
+                  <p className="text-sm font-semibold text-zinc-700">
+                    Seu carrinho ainda esta vazio.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Adicione uma capinha finalizada para continuar montando o pedido.
+                  </p>
+                </div>
+              ) : (
+                carrinho.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="rounded-[28px] border border-white/80 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#efe9df]">
+                        {item.previewLocal || item.imagemPreviewUrl ? (
+                          <img
+                            src={item.previewLocal || item.imagemPreviewUrl}
+                            alt={`Preview do item ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ShoppingCart className="h-5 w-5 text-zinc-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">
+                          Item {index + 1}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-zinc-800">{item.modelo}</p>
+                        <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">
+                          {item.marca}
+                        </p>
+                        <p className="mt-2 text-xs text-zinc-600">{item.resumo}</p>
+                        <p className="mt-2 text-xs font-semibold text-[#435446]">
+                          Quantidade: {item.quantidade}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removerItemDoCarrinho(item.id)}
+                        className="rounded-full border border-zinc-200 p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        aria-label={`Remover item ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {canFinish && (
+                <div className="rounded-[28px] border border-[#6d7b6b]/15 bg-[#e4ebe1] p-4">
+                  <p className="text-sm font-bold text-[#435446]">Item atual pronto para enviar</p>
+                  <p className="mt-1 text-xs text-[#435446]/80">
+                    {selectedBrand} {selectedModel ? `• ${selectedModel.name}` : ''} • Quantidade {quantity}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={adicionarItemAoCarrinho}
+                    disabled={isUploadingOrder}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#435446] px-4 py-2 text-xs font-semibold text-white disabled:bg-zinc-300"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Adicionar item atual
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-[#6d7b6b]/15 bg-white/80 p-5">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-zinc-500">Total de unidades</span>
+                <strong className="text-zinc-800">{quantidadeItensCarrinho}</strong>
+              </div>
+              <div className="mb-4 flex items-center justify-between text-sm">
+                <span className="text-zinc-500">Valor estimado</span>
+                <strong className="text-zinc-800">
+                  R$ {(quantidadeItensCarrinho * unitPrice).toFixed(2)}
+                </strong>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={limparCarrinho}
+                  disabled={!carrinho.length}
+                  className="flex-1 rounded-[18px] border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={finalizarPedidoCarrinho}
+                  disabled={isUploadingOrder || (!carrinho.length && !canFinish)}
+                  className="flex-1 rounded-[18px] bg-[#435446] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-zinc-300"
+                >
+                  {isUploadingOrder ? 'Enviando...' : 'Finalizar pedido'}
+                </button>
+              </div>
+            </div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   const showMobileSuggestions =
@@ -1929,6 +2318,22 @@ ${previewImageUrl}
             background: 'transparent',
           }}
         >
+          {selectedModel?.col2 && (
+            <img
+              src={selectedModel.col2}
+              crossOrigin="anonymous"
+              alt="Base da capinha"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                display: 'block',
+                zIndex: 1,
+              }}
+            />
+          )}
+
           {!textOnlyMode && image && (
             <div
               style={{
@@ -2105,15 +2510,19 @@ ${previewImageUrl}
           style={{ height: `${viewport.height}px`, minHeight: `${viewport.height}px` }}
         >
           <header className="sticky top-0 z-40 border-b border-[#6d7b6b]/15 bg-[#e4ebe1]/95 px-4 py-2 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-[680px] flex-col items-center justify-center gap-1 text-center">
-              <img
-                src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-                alt="Logo Pamda Cases"
-                className="h-[42px] w-auto"
-              />
-              <p className="font-lexend text-[8px] font-bold text-[#435446]">
-                Sua capinha, do seu jeito!
-              </p>
+            <div className="mx-auto flex w-full max-w-[680px] items-center justify-between gap-3">
+              <div className="flex-1" />
+              <div className="flex flex-col items-center justify-center gap-1 text-center">
+                <img
+                  src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
+                  alt="Logo Pamda Cases"
+                  className="h-[42px] w-auto"
+                />
+                <p className="font-lexend text-[8px] font-bold text-[#435446]">
+                  Sua capinha, do seu jeito!
+                </p>
+              </div>
+              <div className="flex flex-1 justify-end">{renderBotaoCarrinho(true)}</div>
             </div>
           </header>
 
@@ -2378,8 +2787,20 @@ ${previewImageUrl}
                       Pedido pronto para envio no WhatsApp!
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={adicionarItemAoCarrinho}
+                    disabled={isUploadingOrder || !canFinish}
+                    className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Adicionar ao carrinho e fazer outra
+                  </button>
                 </section>
-                {renderMobileBottomBar({ onPrimary: handleFinish, primaryLabel: isUploadingOrder ? 'Enviando...' : 'Finalizar', primaryDisabled: isUploadingOrder || !canFinish })}
+                {renderMobileBottomBar({
+                  onPrimary: handleFinish,
+                  primaryLabel: isUploadingOrder ? 'Enviando...' : 'Finalizar pedido',
+                  primaryDisabled: isUploadingOrder || (!carrinho.length && !canFinish),
+                })}
               </>
             )}
           </div>
@@ -2388,6 +2809,7 @@ ${previewImageUrl}
         <div className="flex min-h-[100dvh] flex-col xl:flex-row">
           <aside className="z-10 flex w-full flex-col overflow-y-auto border-b border-zinc-200 bg-bamboo xl:max-h-[100dvh] xl:w-96 xl:border-b-0 xl:border-r">
             <div className="border-b border-zinc-100/50 p-8 text-center">
+              <div className="mb-5 flex justify-end">{renderBotaoCarrinho()}</div>
               <div className="mb-4">
                 <img
                   src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
@@ -2780,10 +3202,21 @@ ${previewImageUrl}
             <div className="mt-auto space-y-4 border-t border-zinc-100 bg-zinc-50/50 p-6">
               {renderOrderSummary()}
               <button
+                type="button"
+                onClick={adicionarItemAoCarrinho}
+                disabled={isUploadingOrder || !canFinish}
+                className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-6 py-4 font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Adicionar ao carrinho e fazer outra
+                </span>
+              </button>
+              <button
                 onClick={handleFinish}
-                disabled={isUploadingOrder || !selectedModel || (!image && !customText.trim())}
+                disabled={isUploadingOrder || (!carrinho.length && !canFinish)}
                 className={`w-full rounded-xl px-6 py-4 font-bold transition-all ${
-                  selectedModel && (image || customText.trim())
+                  carrinho.length || canFinish
                     ? 'scale-[1.02] bg-zinc-900 text-white shadow-xl active:scale-100 hover:bg-zinc-800'
                     : 'cursor-not-allowed bg-zinc-200 text-zinc-400'
                 }`}
@@ -2813,6 +3246,7 @@ ${previewImageUrl}
           </main>
         </div>
       )}
+      {renderPainelCarrinho()}
       {renderExportLayers()}
     </div>
   );
