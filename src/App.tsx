@@ -495,7 +495,7 @@ export default function App() {
       try {
         await loadFile(file);
         if (isMobileLayout) {
-          setIsMobileImageEditing(true);
+          openMobileImageEditor();
         }
       } catch (error) {
         console.error(error);
@@ -530,7 +530,7 @@ export default function App() {
       try {
         await loadFile(file);
         if (isMobileLayout) {
-          setIsMobileImageEditing(true);
+          openMobileImageEditor();
         }
       } catch (error) {
         console.error(error);
@@ -584,6 +584,16 @@ export default function App() {
     setTextStrokeColor('#000000');
     setTextOnlyMode(false);
     setIsMobileTextModalOpen(false);
+  };
+
+  const openMobileImageEditor = () => {
+    setIsMobileTextModalOpen(false);
+    setIsMobileImageEditing(true);
+  };
+
+  const openMobileTextEditor = () => {
+    setIsMobileImageEditing(false);
+    setIsMobileTextModalOpen(true);
   };
 
   const moveImage = (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -1441,8 +1451,19 @@ ${previewImageUrl}
     };
   };
 
-  const renderPhonePreview = (mobile = false, interactive = true) => (
-    <div className="relative">
+  const renderPhonePreview = (
+    mobile = false,
+    interactive = true,
+    options?: {
+      imageInteractive?: boolean;
+      textInteractive?: boolean;
+    }
+  ) => {
+    const imageInteractive = options?.imageInteractive ?? interactive;
+    const textInteractive = options?.textInteractive ?? interactive;
+
+    return (
+      <div className="relative">
       <motion.div>
         <div
           ref={containerRef}
@@ -1472,12 +1493,12 @@ ${previewImageUrl}
               }}
             >
               <motion.div
-                drag={interactive}
+                drag={imageInteractive}
                 dragConstraints={dragLimits}
                 dragElastic={0}
                 dragMomentum={false}
                 onDragEnd={(_, info) => {
-                  if (!interactive) return;
+                  if (!imageInteractive) return;
                   setPosition((prev) => {
                     const nextX = prev.x + info.offset.x;
                     const nextY = prev.y + info.offset.y;
@@ -1518,20 +1539,22 @@ ${previewImageUrl}
 
           {customText && (
             <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-              <div className="pointer-events-none absolute inset-y-[12%] left-1/2 w-px -translate-x-1/2 bg-[#435446]/25" />
+              {textInteractive && (
+                <div className="pointer-events-none absolute inset-y-[12%] left-1/2 w-px -translate-x-1/2 bg-[#435446]/25" />
+              )}
               <motion.div
-                drag
+                drag={textInteractive}
                 dragElastic={0}
                 dragMomentum={false}
                 style={{
                   x: textPosition.x,
                   y: textPosition.y,
                   rotate: textRotation,
-                  pointerEvents: 'auto',
-                  cursor: 'move',
+                  pointerEvents: textInteractive ? 'auto' : 'none',
+                  cursor: textInteractive ? 'move' : 'default',
                 }}
                 onDragEnd={(_, info) => {
-                  if (!interactive) return;
+                  if (!textInteractive) return;
                   setTextPosition((prev) => ({
                     x: snapTextToVerticalCenter(prev.x + info.offset.x),
                     y: prev.y + info.offset.y,
@@ -1539,11 +1562,15 @@ ${previewImageUrl}
                 }}
                 className="relative max-w-[75%] select-none"
               >
-                <div className="relative rounded-sm border-2 border-green-600/60 bg-transparent px-3 py-2">
+                <div
+                  className={`relative rounded-sm bg-transparent px-3 py-2 ${
+                    textInteractive ? 'border-2 border-green-600/60' : 'border-2 border-transparent'
+                  }`}
+                >
                   <div style={textRenderStyle}>{customText}</div>
 
                   <div className="absolute -top-10 left-1/2 flex -translate-x-1/2 gap-2 pointer-events-auto">
-                    {interactive && (
+                    {textInteractive && (
                       <>
                         <button
                           onClick={(e) => {
@@ -1570,7 +1597,7 @@ ${previewImageUrl}
                     )}
                   </div>
 
-                  {interactive && (
+                  {textInteractive && (
                     <motion.div
                       drag
                       dragElastic={0}
@@ -1585,7 +1612,7 @@ ${previewImageUrl}
                     />
                   )}
 
-                  {interactive && (
+                  {textInteractive && (
                     <>
                       <div className="absolute -top-1 -left-1 h-2 w-2 border-t-2 border-l-2 border-green-600" />
                       <div className="absolute -top-1 -right-1 h-2 w-2 border-t-2 border-r-2 border-green-600" />
@@ -1610,7 +1637,7 @@ ${previewImageUrl}
             src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
             crossOrigin="anonymous"
             alt="Pamda"
-            className="pointer-events-none absolute top-160 right-43 z-50 w-17 opacity-90"
+            className="pointer-events-none absolute top-153 right-40 z-50 w-17 opacity-90"
           />
         </div>
       </motion.div>
@@ -1626,7 +1653,7 @@ ${previewImageUrl}
         </div>
       )}
 
-      {image && interactive && (
+      {image && imageInteractive && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1641,7 +1668,8 @@ ${previewImageUrl}
         </motion.div>
       )}
     </div>
-  );
+    );
+  };
 
   const renderOrderSummary = () => (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -2732,7 +2760,10 @@ ${previewImageUrl}
                         paddingRight: `${viewport.width < 360 ? 28 : 48}px`,
                       }}
                     >
-                      {renderPhonePreview(true)}
+                      {renderPhonePreview(true, true, {
+                        imageInteractive: isMobileImageEditing,
+                        textInteractive: isMobileTextModalOpen,
+                      })}
                       {renderMobileImageControls()}
                     </div>
                     <div
@@ -2743,7 +2774,7 @@ ${previewImageUrl}
                         type="button"
                         onClick={() => {
                           if (image) {
-                            setIsMobileImageEditing(true);
+                            openMobileImageEditor();
                             return;
                           }
 
@@ -2758,7 +2789,7 @@ ${previewImageUrl}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsMobileTextModalOpen(true)}
+                        onClick={openMobileTextEditor}
                         className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[22px] border border-white/80 bg-white/94 px-4 text-sm font-semibold text-zinc-800 shadow-[0_12px_28px_rgba(15,23,42,0.08)] transition-transform"
                       >
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e4ebe1] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
