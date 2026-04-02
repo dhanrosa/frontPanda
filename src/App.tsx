@@ -78,6 +78,11 @@ const MAX_CUSTOM_TEXT_LENGTH = 80;
 const EXPORT_WIDTH = 405;
 const EXPORT_HEIGHT = 720;
 const PREVIEW_ASPECT_RATIO = EXPORT_WIDTH / EXPORT_HEIGHT;
+const IMAGE_AREA_HORIZONTAL_INSET = 0.08;
+const IMAGE_AREA_VERTICAL_INSET = 0.035;
+const IMAGE_AREA_ASPECT_RATIO =
+  (EXPORT_WIDTH * (1 - IMAGE_AREA_HORIZONTAL_INSET * 2)) /
+  (EXPORT_HEIGHT * (1 - IMAGE_AREA_VERTICAL_INSET * 2));
 const MOBILE_LAYOUT_MAX_WIDTH = 1180;
 const MOBILE_LAYOUT_MIN_HEIGHT = 820;
 const MOBILE_HEADER_ESTIMATED_HEIGHT = 84;
@@ -222,6 +227,8 @@ export default function App() {
       ? 1 / imageRatio
       : imageRatio
     : 1;
+  const shouldFitImageToHeight = effectiveRatio >= IMAGE_AREA_ASPECT_RATIO;
+  const activeZoom = isMobileLayout ? zoom : 100;
 
   const getScaledStroke = (fontSize: number) => {
     if (textStroke <= 0) return 0;
@@ -424,7 +431,7 @@ export default function App() {
       let fittedWidth = 0;
       let fittedHeight = 0;
 
-      if (effectiveRatio >= 0.95) {
+      if (shouldFitImageToHeight) {
         fittedHeight = areaHeight;
         fittedWidth = areaHeight * effectiveRatio;
       } else {
@@ -432,7 +439,7 @@ export default function App() {
         fittedHeight = areaWidth / effectiveRatio;
       }
 
-      const scaleMultiplier = (zoom / 100) * (isQuarterTurn ? 1.02 : 1);
+      const scaleMultiplier = (activeZoom / 100) * (isQuarterTurn ? 1.02 : 1);
       const finalWidth = fittedWidth * scaleMultiplier;
       const finalHeight = fittedHeight * scaleMultiplier;
 
@@ -459,7 +466,7 @@ export default function App() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', updateLimits);
     };
-  }, [effectiveRatio, image, isQuarterTurn, selectedModel?.id, zoom]);
+  }, [activeZoom, effectiveRatio, image, isQuarterTurn, selectedModel?.id, shouldFitImageToHeight]);
 
   useEffect(() => {
     if (!image && currentStep === 3) {
@@ -1384,9 +1391,7 @@ ${previewImageUrl}
           </button>
         ))}
       </div>
-git add .
-git commit -m "sua mensagem aqui"
-git push
+
       <div
         className={`grid grid-cols-1 gap-2 overflow-y-auto custom-scrollbar ${
           mobile ? 'max-h-44 pr-1' : 'max-h-48 pr-2'
@@ -1651,7 +1656,7 @@ git push
                 style={{
                   x: scaledImagePosition.x,
                   y: scaledImagePosition.y,
-                  scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
+                  scale: (activeZoom / 100) * (isQuarterTurn ? 1.95 : 1),
                   rotate: imageRotation,
                   width: '100%',
                   height: '100%',
@@ -1667,7 +1672,7 @@ git push
                     transform: isMirrored ? 'scaleX(-1)' : 'scaleX(1)',
                   }}
                   className={`pointer-events-none select-none ${
-                    effectiveRatio && effectiveRatio >= 0.95
+                    shouldFitImageToHeight
                       ? 'h-full w-auto'
                       : 'h-auto w-full'
                   } max-h-none max-w-none`}
@@ -2776,7 +2781,7 @@ git push
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transform: `translate(${exportImagePosition.x}px, ${exportImagePosition.y}px) rotate(${imageRotation}deg) scale(${(zoom / 100) * (isQuarterTurn ? 1.95 : 1)})${isMirrored ? ' scaleX(-1)' : ''}`,
+                  transform: `translate(${exportImagePosition.x}px, ${exportImagePosition.y}px) rotate(${imageRotation}deg) scale(${(activeZoom / 100) * (isQuarterTurn ? 1.95 : 1)})${isMirrored ? ' scaleX(-1)' : ''}`,
                   transformOrigin: 'center center',
                 }}
               >
@@ -2784,7 +2789,7 @@ git push
                   src={image}
                   alt="Arte do cliente"
                   style={{
-                    ...(effectiveRatio && effectiveRatio >= 0.95
+                    ...(shouldFitImageToHeight
                       ? { height: '100%', width: 'auto' }
                       : { width: '100%', height: 'auto' }),
                     maxWidth: 'none',
@@ -2879,7 +2884,7 @@ git push
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transform: `translate(${exportImagePosition.x}px, ${exportImagePosition.y}px) rotate(${imageRotation}deg) scale(${(zoom / 100) * (isQuarterTurn ? 1.95 : 1)})${isMirrored ? ' scaleX(-1)' : ''}`,
+                  transform: `translate(${exportImagePosition.x}px, ${exportImagePosition.y}px) rotate(${imageRotation}deg) scale(${(activeZoom / 100) * (isQuarterTurn ? 1.95 : 1)})${isMirrored ? ' scaleX(-1)' : ''}`,
                   transformOrigin: 'center center',
                 }}
               >
@@ -2887,7 +2892,7 @@ git push
                   src={image}
                   alt="Arte do cliente"
                   style={{
-                    ...(effectiveRatio && effectiveRatio >= 0.95
+                    ...(shouldFitImageToHeight
                       ? { height: '100%', width: 'auto' }
                       : { width: '100%', height: 'auto' }),
                     maxWidth: 'none',
@@ -3322,7 +3327,7 @@ git push
                           Ajustes da Imagem
                         </label>
                         <span className="text-[10px] font-mono text-zinc-500">
-                          Zoom: {zoom}%
+                          Zoom: {activeZoom}%
                         </span>
                       </div>
 
@@ -3331,13 +3336,15 @@ git push
                           <div className="flex rounded-lg bg-zinc-100 p-1">
                             <button
                               onClick={() => setZoom(Math.max(100, zoom - 10))}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
+                              disabled={!isMobileLayout}
+                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               <ZoomOut className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => setZoom(Math.min(300, zoom + 10))}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
+                              disabled={!isMobileLayout}
+                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               <ZoomIn className="h-4 w-4" />
                             </button>
@@ -3393,9 +3400,10 @@ git push
                           type="range"
                           min="100"
                           max="300"
-                          value={zoom}
+                          value={activeZoom}
                           onChange={(e) => setZoom(parseInt(e.target.value))}
-                          className="w-full accent-indigo-600"
+                          disabled={!isMobileLayout}
+                          className="w-full accent-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </div>
                     </section>
