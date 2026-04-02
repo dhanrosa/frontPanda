@@ -1586,14 +1586,16 @@ ${previewImageUrl}
       x: position.x * (mobile ? mobileReferenceScale : 1),
       y: position.y * (mobile ? mobileReferenceScale : 1),
     };
-    const pamdaLogoStyle: React.CSSProperties = {
-      top: `${(153 / EXPORT_HEIGHT) * 100}%`,
-      right: `${(40 / EXPORT_WIDTH) * 100}%`,
-      width: `${(17 / EXPORT_WIDTH) * 100}%`,
-      height: 'auto',
-      zIndex: 50,
-      opacity: 0.9,
-    };
+    const pamdaLogoStyle: React.CSSProperties | undefined = mobile
+      ? {
+          top: `${(153 / EXPORT_HEIGHT) * 100}%`,
+          right: `${(40 / EXPORT_WIDTH) * 100}%`,
+          width: `${(17 / EXPORT_WIDTH) * 100}%`,
+          height: 'auto',
+          zIndex: 50,
+          opacity: 0.9,
+        }
+      : undefined;
 
     return (
       <div className="relative">
@@ -1780,7 +1782,9 @@ ${previewImageUrl}
             src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
             crossOrigin="anonymous"
             alt="Pamda"
-            className="pointer-events-none absolute"
+            className={`pointer-events-none absolute ${
+              mobile ? '' : 'top-153 right-40 z-50 w-17 opacity-90'
+            }`}
             style={pamdaLogoStyle}
           />
         </div>
