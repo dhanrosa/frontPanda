@@ -1783,7 +1783,7 @@ ${previewImageUrl}
             crossOrigin="anonymous"
             alt="Pamda"
             className={`pointer-events-none absolute ${
-              mobile ? '' : 'top-153 right-40 z-50 w-17 opacity-90'
+              mobile ? '' : 'top-151 right-40 z-50 w-17 opacity-90'
             }`}
             style={pamdaLogoStyle}
           />
