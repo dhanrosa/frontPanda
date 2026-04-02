@@ -147,6 +147,19 @@ export default function App() {
   const exportRef = useRef<HTMLDivElement>(null);
   const productionRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+  const mobileInspectViewportRef = useRef<HTMLDivElement>(null);
+  const mobileInspectGestureRef = useRef({
+    mode: 'none' as 'none' | 'pan' | 'pinch',
+    startDistance: 0,
+    startScale: 1,
+    startOffset: { x: 0, y: 0 },
+    startTouch: { x: 0, y: 0 },
+    startMidpoint: { x: 0, y: 0 },
+  });
+  const mobileTextGestureRef = useRef({
+    startDistance: 0,
+    startSize: 24,
+  });
 
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -159,6 +172,10 @@ export default function App() {
   const [isBrandSearchMode, setIsBrandSearchMode] = useState(false);
   const [isMobileImageEditing, setIsMobileImageEditing] = useState(false);
   const [isMobileTextModalOpen, setIsMobileTextModalOpen] = useState(false);
+  const [isMobileTextEditing, setIsMobileTextEditing] = useState(false);
+  const [isMobileFullscreenPreviewOpen, setIsMobileFullscreenPreviewOpen] = useState(false);
+  const [mobileInspectScale, setMobileInspectScale] = useState(1);
+  const [mobileInspectOffset, setMobileInspectOffset] = useState({ x: 0, y: 0 });
   const [viewport, setViewport] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 1280,
     height: typeof window !== 'undefined' ? window.innerHeight : 800,
@@ -170,6 +187,10 @@ export default function App() {
       : false
   );
   const [previewRenderSize, setPreviewRenderSize] = useState({
+    width: EXPORT_WIDTH,
+    height: EXPORT_HEIGHT,
+  });
+  const [mobileEditorReferenceSize, setMobileEditorReferenceSize] = useState({
     width: EXPORT_WIDTH,
     height: EXPORT_HEIGHT,
   });
@@ -384,6 +405,13 @@ export default function App() {
   }, [currentStep, customText, image, isMobileLayout, selectedModel?.id]);
 
   useEffect(() => {
+    if (!isMobileLayout || currentStep !== 3) return;
+    if (!previewRenderSize.width || !previewRenderSize.height) return;
+
+    setMobileEditorReferenceSize(previewRenderSize);
+  }, [currentStep, isMobileLayout, previewRenderSize]);
+
+  useEffect(() => {
     if (!imageAreaRef.current || !image || !effectiveRatio) return;
 
     const updateLimits = () => {
@@ -438,6 +466,20 @@ export default function App() {
       setIsMobileImageEditing(false);
     }
   }, [currentStep, image]);
+
+  useEffect(() => {
+    if (!customText.trim()) {
+      setIsMobileTextEditing(false);
+    }
+  }, [customText]);
+
+  useEffect(() => {
+    if (!isMobileFullscreenPreviewOpen) {
+      setMobileInspectScale(1);
+      setMobileInspectOffset({ x: 0, y: 0 });
+      mobileInspectGestureRef.current.mode = 'none';
+    }
+  }, [isMobileFullscreenPreviewOpen]);
 
   const isHeicFile = (file: File) => {
     const fileName = file.name.toLowerCase();
@@ -583,17 +625,35 @@ export default function App() {
     setTextStroke(0);
     setTextStrokeColor('#000000');
     setTextOnlyMode(false);
+    setIsMobileTextEditing(false);
     setIsMobileTextModalOpen(false);
   };
 
   const openMobileImageEditor = () => {
     setIsMobileTextModalOpen(false);
+    setIsMobileTextEditing(false);
     setIsMobileImageEditing(true);
   };
 
   const openMobileTextEditor = () => {
     setIsMobileImageEditing(false);
+    setIsMobileTextEditing(false);
     setIsMobileTextModalOpen(true);
+  };
+
+  const moveText = (direction: 'up' | 'down' | 'left' | 'right') => {
+    const step = 18;
+
+    setTextPosition((prev) => {
+      const next = { ...prev };
+
+      if (direction === 'up') next.y -= step;
+      if (direction === 'down') next.y += step;
+      if (direction === 'left') next.x = snapTextToVerticalCenter(prev.x - step);
+      if (direction === 'right') next.x = snapTextToVerticalCenter(prev.x + step);
+
+      return next;
+    });
   };
 
   const moveImage = (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -1120,6 +1180,7 @@ ${previewImageUrl}
     y: position.y * exportScaleY,
   };
   const editorTextareaFontSize = getEditorTextareaFontSize(customText, textSize);
+  const mobileEditorStrokeSize = getScaledStroke(editorTextareaFontSize);
   const canFinish = Boolean(selectedModel && (image || customText.trim()));
   const totalSteps = 4;
 
@@ -1237,12 +1298,28 @@ ${previewImageUrl}
 
   const nextStep = () => {
     if (!canProceedFromStep()) return;
+    if (currentStep === 3) {
+      lockMobileEditorTransforms();
+    }
 
     setCurrentStep((prev) => Math.min(totalSteps, prev + 1));
   };
 
   const prevStep = () => {
     setCurrentStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const returnToMobileEditor = () => {
+    setCurrentStep(3);
+
+    if (image) {
+      openMobileImageEditor();
+      return;
+    }
+
+    if (customText.trim()) {
+      openMobileTextEditor();
+    }
   };
 
   const selectBrand = (
@@ -1307,22 +1384,9 @@ ${previewImageUrl}
           </button>
         ))}
       </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input
-          type="text"
-          placeholder="Buscar modelo ou marca..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full rounded-xl border border-zinc-200 py-2.5 pl-10 pr-4 text-sm outline-none transition-all ${
-            mobile
-              ? 'bg-white focus:ring-2 focus:ring-zinc-900'
-              : 'bg-zinc-50 focus:ring-2 focus:ring-indigo-500'
-          }`}
-        />
-      </div>
-
+git add .
+git commit -m "sua mensagem aqui"
+git push
       <div
         className={`grid grid-cols-1 gap-2 overflow-y-auto custom-scrollbar ${
           mobile ? 'max-h-44 pr-1' : 'max-h-48 pr-2'
@@ -1415,10 +1479,28 @@ ${previewImageUrl}
     </div>
   );
 
-  const getPreviewFrameStyle = (mobile = false): React.CSSProperties => {
+  const getPreviewFrameDimensions = (
+    mobile = false,
+    options?: { fullscreen?: boolean }
+  ) => {
     if (mobile) {
+      const fullscreen = options?.fullscreen ?? false;
+      if (fullscreen) {
+        const horizontalPadding = clamp(viewport.width * 0.04, 10, 24);
+        const verticalPadding = clamp(viewport.height * 0.05, 28, 56);
+        const maxWidth = Math.max(240, viewport.width - horizontalPadding * 2);
+        const maxHeight = Math.max(320, viewport.height - verticalPadding * 2);
+        const width = Math.min(maxWidth, maxHeight * PREVIEW_ASPECT_RATIO);
+
+        return {
+          width,
+          height: width / PREVIEW_ASPECT_RATIO,
+        };
+      }
+
       const horizontalPadding = clamp(viewport.width * 0.12, 24, 52);
       const maxWidthFromViewport = Math.max(190, viewport.width - horizontalPadding * 2);
+      const isLargeMobilePreviewStep = currentStep === 4;
       const reservedHeight =
         MOBILE_HEADER_ESTIMATED_HEIGHT +
         MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT +
@@ -1426,14 +1508,18 @@ ${previewImageUrl}
         (currentStep === 3 ? 250 : currentStep === 4 ? 210 : 180);
       const maxHeight = Math.max(220, viewport.height - reservedHeight);
       const width = Math.min(
-        clamp(viewport.width * 0.58, 190, 236),
+        clamp(
+          viewport.width * (isLargeMobilePreviewStep ? 0.7 : 0.58),
+          isLargeMobilePreviewStep ? 220 : 190,
+          isLargeMobilePreviewStep ? 300 : 236
+        ),
         maxWidthFromViewport,
         maxHeight * PREVIEW_ASPECT_RATIO
       );
 
       return {
-        width: `${width}px`,
-        height: `${width / PREVIEW_ASPECT_RATIO}px`,
+        width,
+        height: width / PREVIEW_ASPECT_RATIO,
       };
     }
 
@@ -1446,8 +1532,20 @@ ${previewImageUrl}
     );
 
     return {
-      width: `${width}px`,
-      height: `${width / PREVIEW_ASPECT_RATIO}px`,
+      width,
+      height: width / PREVIEW_ASPECT_RATIO,
+    };
+  };
+
+  const getPreviewFrameStyle = (
+    mobile = false,
+    options?: { fullscreen?: boolean }
+  ): React.CSSProperties => {
+    const dimensions = getPreviewFrameDimensions(mobile, options);
+
+    return {
+      width: `${dimensions.width}px`,
+      height: `${dimensions.height}px`,
     };
   };
 
@@ -1457,10 +1555,44 @@ ${previewImageUrl}
     options?: {
       imageInteractive?: boolean;
       textInteractive?: boolean;
+      showInlineTextControls?: boolean;
+      allowTextResize?: boolean;
+      fullscreen?: boolean;
     }
   ) => {
     const imageInteractive = options?.imageInteractive ?? interactive;
     const textInteractive = options?.textInteractive ?? interactive;
+    const showInlineTextControls = options?.showInlineTextControls ?? textInteractive;
+    const allowTextResize = options?.allowTextResize ?? textInteractive;
+    const isFullscreen = options?.fullscreen ?? false;
+    const mobileFrameRadius = clamp(viewport.width * 0.075, 24, 34);
+    const previewFrameDimensions = getPreviewFrameDimensions(mobile, {
+      fullscreen: isFullscreen,
+    });
+    const mobileReferenceScale =
+      mobile && mobileEditorReferenceSize.width > 0
+        ? previewFrameDimensions.width / mobileEditorReferenceSize.width
+        : 1;
+    const textPreviewStyle = buildTextStyle(
+      mobile ? textSize * mobileReferenceScale : textSize,
+      mobile ? mobileReferenceScale : 1
+    );
+    const scaledTextPosition = {
+      x: textPosition.x * (mobile ? mobileReferenceScale : 1),
+      y: textPosition.y * (mobile ? mobileReferenceScale : 1),
+    };
+    const scaledImagePosition = {
+      x: position.x * (mobile ? mobileReferenceScale : 1),
+      y: position.y * (mobile ? mobileReferenceScale : 1),
+    };
+    const pamdaLogoStyle: React.CSSProperties = {
+      top: `${(153 / EXPORT_HEIGHT) * 100}%`,
+      right: `${(40 / EXPORT_WIDTH) * 100}%`,
+      width: `${(17 / EXPORT_WIDTH) * 100}%`,
+      height: 'auto',
+      zIndex: 50,
+      opacity: 0.9,
+    };
 
     return (
       <div className="relative">
@@ -1468,9 +1600,16 @@ ${previewImageUrl}
         <div
           ref={containerRef}
           className={`relative flex items-center justify-center overflow-hidden ${
-            mobile ? 'mx-auto rounded-[48px]' : 'rounded-[60px]'
+            mobile ? 'mx-auto' : 'rounded-[60px]'
           }`}
-          style={getPreviewFrameStyle(mobile)}
+          style={{
+            ...getPreviewFrameStyle(mobile, { fullscreen: isFullscreen }),
+            ...(mobile
+              ? {
+                  borderRadius: `${isFullscreen ? clamp(viewport.width * 0.06, 18, 28) : mobileFrameRadius}px`,
+                }
+              : {}),
+          }}
         >
           {selectedModel?.col2 && (
             <img
@@ -1510,8 +1649,8 @@ ${previewImageUrl}
                   });
                 }}
                 style={{
-                  x: position.x,
-                  y: position.y,
+                  x: scaledImagePosition.x,
+                  y: scaledImagePosition.y,
                   scale: (zoom / 100) * (isQuarterTurn ? 1.95 : 1),
                   rotate: imageRotation,
                   width: '100%',
@@ -1546,12 +1685,15 @@ ${previewImageUrl}
                 drag={textInteractive}
                 dragElastic={0}
                 dragMomentum={false}
+                onTouchStart={handleMobileTextTouchStart}
+                onTouchMove={handleMobileTextTouchMove}
                 style={{
-                  x: textPosition.x,
-                  y: textPosition.y,
+                  x: scaledTextPosition.x,
+                  y: scaledTextPosition.y,
                   rotate: textRotation,
                   pointerEvents: textInteractive ? 'auto' : 'none',
                   cursor: textInteractive ? 'move' : 'default',
+                  touchAction: textInteractive ? 'none' : 'auto',
                 }}
                 onDragEnd={(_, info) => {
                   if (!textInteractive) return;
@@ -1567,10 +1709,10 @@ ${previewImageUrl}
                     textInteractive ? 'border-2 border-green-600/60' : 'border-2 border-transparent'
                   }`}
                 >
-                  <div style={textRenderStyle}>{customText}</div>
+                  <div style={textPreviewStyle}>{customText}</div>
 
                   <div className="absolute -top-10 left-1/2 flex -translate-x-1/2 gap-2 pointer-events-auto">
-                    {textInteractive && (
+                    {showInlineTextControls && (
                       <>
                         <button
                           onClick={(e) => {
@@ -1597,7 +1739,7 @@ ${previewImageUrl}
                     )}
                   </div>
 
-                  {textInteractive && (
+                  {textInteractive && allowTextResize && (
                     <motion.div
                       drag
                       dragElastic={0}
@@ -1637,7 +1779,8 @@ ${previewImageUrl}
             src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
             crossOrigin="anonymous"
             alt="Pamda"
-            className="pointer-events-none absolute top-153 right-40 z-50 w-17 opacity-90"
+            className="pointer-events-none absolute"
+            style={pamdaLogoStyle}
           />
         </div>
       </motion.div>
@@ -1899,18 +2042,177 @@ ${previewImageUrl}
     mobileSuggestions.length > 0 &&
     (isMobileSearchActive || Boolean(mobileBrandSearchQuery.trim()));
 
+  const clampInspectOffset = (
+    nextOffset: { x: number; y: number },
+    nextScale: number,
+    bounds: { width: number; height: number }
+  ) => {
+    const maxOffsetX = ((nextScale - 1) * bounds.width) / 2;
+    const maxOffsetY = ((nextScale - 1) * bounds.height) / 2;
+
+    return {
+      x: clamp(nextOffset.x, -maxOffsetX, maxOffsetX),
+      y: clamp(nextOffset.y, -maxOffsetY, maxOffsetY),
+    };
+  };
+
+  const getTouchPoint = (touch: Touch, bounds: DOMRect) => ({
+    x: touch.clientX - bounds.left,
+    y: touch.clientY - bounds.top,
+  });
+
+  const getTouchDistance = (first: { x: number; y: number }, second: { x: number; y: number }) =>
+    Math.hypot(second.x - first.x, second.y - first.y);
+
+  const getTouchMidpoint = (first: { x: number; y: number }, second: { x: number; y: number }) => ({
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  });
+
+  const getMobileInspectBounds = () =>
+    mobileInspectViewportRef.current?.getBoundingClientRect() ?? null;
+
+  const handleMobileTextTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobileTextEditing || e.touches.length !== 2) return;
+
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const first = getTouchPoint(e.touches[0], bounds);
+    const second = getTouchPoint(e.touches[1], bounds);
+    mobileTextGestureRef.current = {
+      startDistance: getTouchDistance(first, second),
+      startSize: textSize,
+    };
+  };
+
+  const handleMobileTextTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobileTextEditing || e.touches.length !== 2) return;
+
+    e.preventDefault();
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const first = getTouchPoint(e.touches[0], bounds);
+    const second = getTouchPoint(e.touches[1], bounds);
+    const nextDistance = getTouchDistance(first, second);
+    const { startDistance, startSize } = mobileTextGestureRef.current;
+
+    if (!startDistance) return;
+
+    setTextSize(
+      Math.round(clamp((nextDistance / startDistance) * startSize, 8, 200))
+    );
+  };
+
+  const lockMobileEditorTransforms = () => {
+    setIsMobileImageEditing(false);
+    setIsMobileTextModalOpen(false);
+    setIsMobileTextEditing(false);
+  };
+
+  const handleMobileInspectTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const bounds = getMobileInspectBounds();
+    if (!bounds) return;
+
+    if (e.touches.length === 2) {
+      const first = getTouchPoint(e.touches[0], bounds);
+      const second = getTouchPoint(e.touches[1], bounds);
+      mobileInspectGestureRef.current = {
+        mode: 'pinch',
+        startDistance: getTouchDistance(first, second),
+        startScale: mobileInspectScale,
+        startOffset: mobileInspectOffset,
+        startTouch: { x: 0, y: 0 },
+        startMidpoint: getTouchMidpoint(first, second),
+      };
+      return;
+    }
+
+    if (e.touches.length === 1 && mobileInspectScale > 1) {
+      const touch = getTouchPoint(e.touches[0], bounds);
+      mobileInspectGestureRef.current = {
+        mode: 'pan',
+        startDistance: 0,
+        startScale: mobileInspectScale,
+        startOffset: mobileInspectOffset,
+        startTouch: touch,
+        startMidpoint: { x: 0, y: 0 },
+      };
+    }
+  };
+
+  const handleMobileInspectTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const bounds = getMobileInspectBounds();
+    if (!bounds) return;
+    const gesture = mobileInspectGestureRef.current;
+
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const first = getTouchPoint(e.touches[0], bounds);
+      const second = getTouchPoint(e.touches[1], bounds);
+      const midpoint = getTouchMidpoint(first, second);
+      const distance = getTouchDistance(first, second);
+      const nextScale = clamp(
+        (distance / Math.max(gesture.startDistance, 1)) * gesture.startScale,
+        1,
+        1.5
+      );
+
+      const midpointDelta = {
+        x: midpoint.x - gesture.startMidpoint.x,
+        y: midpoint.y - gesture.startMidpoint.y,
+      };
+
+      setMobileInspectScale(nextScale);
+      setMobileInspectOffset(
+        clampInspectOffset(
+          {
+            x: gesture.startOffset.x + midpointDelta.x,
+            y: gesture.startOffset.y + midpointDelta.y,
+          },
+          nextScale,
+          bounds
+        )
+      );
+      return;
+    }
+
+    if (e.touches.length === 1 && gesture.mode === 'pan' && mobileInspectScale > 1) {
+      e.preventDefault();
+      const touch = getTouchPoint(e.touches[0], bounds);
+      const delta = {
+        x: touch.x - gesture.startTouch.x,
+        y: touch.y - gesture.startTouch.y,
+      };
+
+      setMobileInspectOffset(
+        clampInspectOffset(
+          {
+            x: gesture.startOffset.x + delta.x,
+            y: gesture.startOffset.y + delta.y,
+          },
+          mobileInspectScale,
+          bounds
+        )
+      );
+    }
+  };
+
+  const handleMobileInspectTouchEnd = () => {
+    mobileInspectGestureRef.current.mode = 'none';
+  };
+
   const renderMobileBottomBar = ({
     onPrimary,
     primaryLabel,
     primaryDisabled = false,
     showReset = false,
     onReset,
+    resetLabel = 'Resetar',
   }: {
     onPrimary: () => void;
     primaryLabel: string;
     primaryDisabled?: boolean;
     showReset?: boolean;
     onReset?: () => void;
+    resetLabel?: string;
   }) => (
     <div className="sticky bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2">
       <div className="mx-auto flex w-full max-w-[680px] items-center gap-2 rounded-[24px] border border-white/80 bg-white/92 p-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md">
@@ -1927,7 +2229,7 @@ ${previewImageUrl}
             onClick={onReset ?? resetTransform}
             className="min-h-11 rounded-[18px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 text-sm font-semibold text-[#435446] transition-colors hover:bg-[#dbe4d8]"
           >
-            Resetar
+            {resetLabel}
           </button>
         )}
         <button
@@ -2024,6 +2326,69 @@ ${previewImageUrl}
     );
   };
 
+  const renderMobileTextControls = () => {
+    if (!isMobileTextEditing || !customText.trim()) return null;
+
+    const controlClassName =
+      'flex h-12 w-12 items-center justify-center rounded-full border border-[#5f6e5b]/20 bg-[#435446] text-white shadow-[0_14px_30px_rgba(67,84,70,0.22)]';
+
+    return (
+      <>
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
+          <div className="pointer-events-auto grid gap-3">
+            <button type="button" onClick={() => moveText('left')} className={controlClassName}>
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => moveText('up')} className={controlClassName}>
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => moveText('down')} className={controlClassName}>
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+          <div className="pointer-events-auto grid gap-3">
+            <button type="button" onClick={() => moveText('right')} className={controlClassName}>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTextRotation((prev) => (prev - 45) % 360)}
+              className={controlClassName}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTextRotation((prev) => (prev + 45) % 360)}
+              className={controlClassName}
+            >
+              <RotateCw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 -bottom-3 flex justify-center">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-white/92 px-3 py-2 shadow-[0_14px_30px_rgba(15,23,42,0.12)]">
+            <span className="min-w-16 text-center text-xs font-semibold text-zinc-500">
+              {((textRotation % 360) + 360) % 360}°
+            </span>
+            <span className="text-xs font-medium text-zinc-400">Pince para ajustar</span>
+            <button
+              type="button"
+              onClick={() => setIsMobileTextEditing(false)}
+              className="rounded-full bg-[#dce8db] px-4 py-3 text-xs font-semibold text-[#435446]"
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   const handleStepReset = () => {
     if (image) {
       clearImage();
@@ -2045,7 +2410,7 @@ ${previewImageUrl}
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 px-4">
         <div
-          className="w-full max-w-[680px] overflow-y-auto rounded-[28px] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+          className="flex w-full max-w-[680px] flex-col overflow-hidden rounded-[28px] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
           style={{ maxHeight: `${Math.max(360, viewport.height - 32)}px` }}
         >
           <div className="mb-2 flex items-start justify-between gap-3">
@@ -2064,16 +2429,16 @@ ${previewImageUrl}
             </button>
           </div>
 
-          <div className="space-y-3">
-            <div className="relative">
+          <div className="sticky top-0 z-10 rounded-[24px] bg-white pb-3">
+            <div className="relative rounded-[24px] border border-zinc-200 bg-zinc-50 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
               <Type className="absolute left-3 top-3 h-4 w-4 text-zinc-400" />
               <textarea
                 placeholder="Escreva seu texto..."
                 value={customText}
                 onChange={handleCustomTextChange}
                 maxLength={MAX_CUSTOM_TEXT_LENGTH}
-                rows={2}
-                className="w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-[#435446]"
+                rows={3}
+                className="min-h-[120px] w-full resize-none rounded-2xl border border-transparent bg-transparent py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-[#435446]/20 focus:ring-2 focus:ring-[#435446]"
                 style={{
                   fontFamily: textFont,
                   fontWeight: isBold ? 700 : 400,
@@ -2082,14 +2447,21 @@ ${previewImageUrl}
                   color: textColor,
                   letterSpacing: `${letterSpacing}px`,
                   fontSize: `${editorTextareaFontSize}px`,
-                  lineHeight: 1.4,
+                  lineHeight: 1.35,
+                  textShadow: buildExternalTextShadow(
+                    mobileEditorStrokeSize,
+                    textStrokeColor
+                  ),
                 }}
               />
-              <div className="mt-2 text-right text-[11px] font-medium text-zinc-400">
-                {customText.length}/{MAX_CUSTOM_TEXT_LENGTH}
+              <div className="mt-2 flex items-center justify-between gap-3 text-[11px] font-medium text-zinc-400">
+                <span>Preview ao vivo da fonte e da borda</span>
+                <span>{customText.length}/{MAX_CUSTOM_TEXT_LENGTH}</span>
               </div>
             </div>
+          </div>
 
+          <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -2328,7 +2700,10 @@ ${previewImageUrl}
 
             <button
               type="button"
-              onClick={() => setIsMobileTextModalOpen(false)}
+              onClick={() => {
+                setIsMobileTextModalOpen(false);
+                setIsMobileTextEditing(Boolean(customText.trim()));
+              }}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[22px] bg-[#435446] px-4 text-sm font-semibold text-white"
             >
               <Check className="h-4 w-4" />
@@ -2762,9 +3137,12 @@ ${previewImageUrl}
                     >
                       {renderPhonePreview(true, true, {
                         imageInteractive: isMobileImageEditing,
-                        textInteractive: isMobileTextModalOpen,
+                        textInteractive: isMobileTextEditing,
+                        showInlineTextControls: false,
+                        allowTextResize: false,
                       })}
                       {renderMobileImageControls()}
+                      {renderMobileTextControls()}
                     </div>
                     <div
                       className="mt-3 grid grid-cols-2"
@@ -2828,7 +3206,16 @@ ${previewImageUrl}
                 <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-20 pr-1 custom-scrollbar">
                   <div className="rounded-[30px] bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
                     <p className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">Preview final</p>
-                    <div className="mt-5 flex justify-center">{renderPhonePreview(true, false)}</div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileFullscreenPreviewOpen(true)}
+                      className="mt-5 flex w-full justify-center rounded-[26px] bg-[linear-gradient(180deg,#f7f4ef_0%,#ece8df_100%)] p-3"
+                    >
+                      {renderPhonePreview(true, false)}
+                    </button>
+                    <p className="mt-3 text-center text-xs font-medium text-zinc-500">
+                      Toque na capinha para ver em tela cheia.
+                    </p>
                   </div>
                   <div className="shrink-0">
                     {renderOrderSummary()}
@@ -2852,6 +3239,45 @@ ${previewImageUrl}
                   primaryLabel: isUploadingOrder ? 'Enviando...' : 'Finalizar pedido',
                   primaryDisabled: isUploadingOrder || (!carrinho.length && !canFinish),
                 })}
+                {isMobileFullscreenPreviewOpen && (
+                  <div className="fixed inset-0 z-[60] bg-zinc-950/85">
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileFullscreenPreviewOpen(false)}
+                      className="absolute right-4 top-4 z-[70] rounded-full bg-white/92 p-3 text-zinc-700 shadow-[0_14px_30px_rgba(15,23,42,0.28)]"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                    <div
+                      ref={mobileInspectViewportRef}
+                      className="flex h-full w-full items-center justify-center overflow-hidden px-4 py-8"
+                      style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+                    >
+                      <div
+                        className="flex h-full w-full items-center justify-center"
+                        style={{
+                          transform: `translate(${mobileInspectOffset.x}px, ${mobileInspectOffset.y}px) scale(${mobileInspectScale})`,
+                          transformOrigin: 'center center',
+                          transition:
+                            mobileInspectGestureRef.current.mode === 'none'
+                              ? 'transform 180ms ease-out'
+                              : 'none',
+                          willChange: 'transform',
+                        }}
+                        onTouchStart={handleMobileInspectTouchStart}
+                        onTouchMove={handleMobileInspectTouchMove}
+                        onTouchEnd={handleMobileInspectTouchEnd}
+                        onTouchCancel={handleMobileInspectTouchEnd}
+                      >
+                        {renderPhonePreview(true, false, {
+                          showInlineTextControls: false,
+                          allowTextResize: false,
+                          fullscreen: true,
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
