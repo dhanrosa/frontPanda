@@ -187,8 +187,8 @@ export default function App() {
   }));
   const [isMobileLayout, setIsMobileLayout] = useState(() =>
     typeof window !== 'undefined'
-      ? window.innerWidth < MOBILE_LAYOUT_MAX_WIDTH ||
-        window.innerHeight < MOBILE_LAYOUT_MIN_HEIGHT
+      ? typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches
       : false
   );
   const [previewRenderSize, setPreviewRenderSize] = useState({
@@ -363,11 +363,7 @@ export default function App() {
         window.matchMedia('(pointer: coarse)').matches;
 
       setViewport(nextViewport);
-      setIsMobileLayout(
-        nextViewport.width < MOBILE_LAYOUT_MAX_WIDTH ||
-          nextViewport.height < MOBILE_LAYOUT_MIN_HEIGHT ||
-          isCoarsePointer
-      );
+      setIsMobileLayout(isCoarsePointer);
     };
 
     handleResize();
