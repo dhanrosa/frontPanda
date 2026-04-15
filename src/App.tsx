@@ -1365,9 +1365,22 @@ ${previewImageUrl}
   const renderModelSelector = (mobile = false) => (
     <section className="space-y-4">
       {!mobile && (
-        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-          Selecione seu Aparelho
-        </label>
+        <>
+          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+            Selecione seu Aparelho
+          </label>
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Pesquisar modelo"
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm text-zinc-700 outline-none transition-all focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </>
       )}
 
       <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
@@ -1783,7 +1796,7 @@ ${previewImageUrl}
             crossOrigin="anonymous"
             alt="Pamda"
             className={`pointer-events-none absolute ${
-              mobile ? '' : 'top-151 right-40 z-50 w-17 opacity-90'
+              mobile ? '' : 'top-13 right-20 z-20 w-15 opacity-90'
             }`}
             style={pamdaLogoStyle}
           />
