@@ -5,7 +5,10 @@ export interface PhoneModel {
   imageUrl?: string;
   cameraLayout: 'single-top-left' | 'dual-vertical-left' | 'triple-square-left' | 'dual-diagonal-left' | 'vertical-strip-left' | 'centered-circle' | 'quad-square-center' | 'iphone-11';
   color: string;
-  hasLogo?: boolean;
+  hasLogo?: boolean;   
+
+
+  
   col1?: string;
   col2?: string;
   col3?: string;

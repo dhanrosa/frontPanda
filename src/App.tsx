@@ -171,6 +171,7 @@ export default function App() {
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [orderCompleted, setOrderCompleted] = useState(false);
+  const [isArtworkApproved, setIsArtworkApproved] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [mobileBrandSearchQuery, setMobileBrandSearchQuery] = useState('');
@@ -207,18 +208,6 @@ export default function App() {
     return [...new Set(phoneModels.map((model) => model.brand).filter(Boolean))];
   }, [phoneModels]);
 
-  const filteredModels = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    if (query) {
-      return phoneModels.filter((m) =>
-        `${m.brand} ${m.name}`.toLowerCase().includes(query)
-      );
-    }
-
-    return phoneModels.filter((m) => m.brand === selectedBrand);
-  }, [phoneModels, searchQuery, selectedBrand]);
-
   const normalizedRotation = ((imageRotation % 360) + 360) % 360;
   const isQuarterTurn = normalizedRotation === 90 || normalizedRotation === 270;
 
@@ -228,7 +217,7 @@ export default function App() {
       : imageRatio
     : 1;
   const shouldFitImageToHeight = effectiveRatio >= IMAGE_AREA_ASPECT_RATIO;
-  const activeZoom = isMobileLayout ? zoom : 100;
+  const activeZoom = zoom;
 
   const getScaledStroke = (fontSize: number) => {
     if (textStroke <= 0) return 0;
@@ -604,6 +593,13 @@ export default function App() {
     setTextStrokeColor('#000000');
   };
 
+  const resetArtwork = () => {
+    clearImage();
+    clearText();
+    resetTransform();
+    setIsMobileImageEditing(false);
+  };
+
   const clearImage = () => {
     setImage(null);
     setOriginalFile(null);
@@ -936,6 +932,7 @@ export default function App() {
     resetTransform();
     setQuantity(1);
     setOrderCompleted(false);
+    setIsArtworkApproved(false);
     setSearchQuery('');
     setMobileBrandSearchQuery('');
     setIsMobileSearchActive(false);
@@ -1055,7 +1052,8 @@ export default function App() {
     }
   };
 
-  const handleFinish = async () => {
+  /*
+  const legacyHandleFinish = async () => {
     return finalizarPedidoCarrinho();
     try {
       if (!selectedModel) {
@@ -1117,6 +1115,16 @@ ${previewImageUrl}
     } finally {
       setIsUploadingOrder(false);
     }
+  };
+  */
+
+  const handleFinish = async () => {
+    if (!isArtworkApproved) {
+      alert('Confirme que a arte foi aprovada pelo cliente antes de finalizar o pedido.');
+      return;
+    }
+
+    return finalizarPedidoCarrinho();
   };
 
   const buildTextStyle = (
@@ -1276,6 +1284,16 @@ ${previewImageUrl}
     () => getRankedModels(mobileBrandSearchQuery, phoneModels, 6),
     [mobileBrandSearchQuery, phoneModels]
   );
+
+  const filteredModels = useMemo(() => {
+    const brandModels = selectedBrand
+      ? phoneModels.filter((model) => model.brand === selectedBrand)
+      : phoneModels;
+
+    return searchQuery.trim()
+      ? getRankedModels(searchQuery, phoneModels)
+      : brandModels;
+  }, [getRankedModels, phoneModels, searchQuery, selectedBrand]);
 
   const mobileModelResults = useMemo(() => {
     const brandModels = phoneModels.filter((model) => model.brand === selectedBrand);
@@ -1796,7 +1814,7 @@ ${previewImageUrl}
             crossOrigin="anonymous"
             alt="Pamda"
             className={`pointer-events-none absolute ${
-              mobile ? '' : 'top-13 right-20 z-20 w-15 opacity-90'
+              mobile ? '' : 'right-18 top-15 z-50 w-16 opacity-90'
             }`}
             style={pamdaLogoStyle}
           />
@@ -2408,18 +2426,7 @@ ${previewImageUrl}
   };
 
   const handleStepReset = () => {
-    if (image) {
-      clearImage();
-      setIsMobileImageEditing(false);
-      return;
-    }
-
-    if (customText.trim()) {
-      clearText();
-      return;
-    }
-
-    resetTransform();
+    resetArtwork();
   };
 
   const renderMobileTextModal = () => {
@@ -3251,11 +3258,28 @@ ${previewImageUrl}
                   >
                     Adicionar ao carrinho e fazer outra
                   </button>
+                  <label className="flex items-start gap-3 rounded-[22px] border border-[#6d7b6b]/15 bg-white px-4 py-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                    <input
+                      type="checkbox"
+                      checked={isArtworkApproved}
+                      onChange={(e) => setIsArtworkApproved(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#435446] focus:ring-[#435446]"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-zinc-800">
+                        Arte aprovada pelo cliente
+                      </span>
+                      <span className="mt-1 block text-xs text-zinc-500">
+                        Marque esta opcao para liberar a finalizacao do pedido.
+                      </span>
+                    </span>
+                  </label>
                 </section>
                 {renderMobileBottomBar({
                   onPrimary: handleFinish,
                   primaryLabel: isUploadingOrder ? 'Enviando...' : 'Finalizar pedido',
-                  primaryDisabled: isUploadingOrder || (!carrinho.length && !canFinish),
+                  primaryDisabled:
+                    isUploadingOrder || !isArtworkApproved || (!carrinho.length && !canFinish),
                 })}
                 {isMobileFullscreenPreviewOpen && (
                   <div className="fixed inset-0 z-[60] bg-zinc-950/85">
@@ -3325,6 +3349,15 @@ ${previewImageUrl}
                   Sua Imagem
                 </label>
                 {renderUploadCard()}
+                <button
+                  type="button"
+                  onClick={resetArtwork}
+                  disabled={!image && !customText.trim()}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Resetar arte
+                </button>
               </section>
               <AnimatePresence>
                 {image && (
@@ -3349,15 +3382,13 @@ ${previewImageUrl}
                           <div className="flex rounded-lg bg-zinc-100 p-1">
                             <button
                               onClick={() => setZoom(Math.max(100, zoom - 10))}
-                              disabled={!isMobileLayout}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
                             >
                               <ZoomOut className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => setZoom(Math.min(300, zoom + 10))}
-                              disabled={!isMobileLayout}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
                             >
                               <ZoomIn className="h-4 w-4" />
                             </button>
@@ -3415,8 +3446,7 @@ ${previewImageUrl}
                           max="300"
                           value={activeZoom}
                           onChange={(e) => setZoom(parseInt(e.target.value))}
-                          disabled={!isMobileLayout}
-                          className="w-full accent-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="w-full accent-indigo-600"
                         />
                       </div>
                     </section>
@@ -3460,15 +3490,8 @@ ${previewImageUrl}
 
                     <div className="flex gap-2 pt-4">
                       <button
-                        onClick={resetTransform}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Resetar
-                      </button>
-                      <button
                         onClick={clearImage}
-                        className="rounded-xl border border-zinc-200 p-2.5 text-zinc-400 transition-all hover:bg-red-50 hover:text-red-500"
+                        className="ml-auto rounded-xl border border-zinc-200 p-2.5 text-zinc-400 transition-all hover:bg-red-50 hover:text-red-500"
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -3710,11 +3733,27 @@ ${previewImageUrl}
                   Adicionar ao carrinho e fazer outra
                 </span>
               </button>
+              <label className="flex items-start gap-3 rounded-xl border border-[#6d7b6b]/15 bg-white px-4 py-4 text-left shadow-sm">
+                <input
+                  type="checkbox"
+                  checked={isArtworkApproved}
+                  onChange={(e) => setIsArtworkApproved(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#435446] focus:ring-[#435446]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-zinc-800">
+                    Arte aprovada pelo cliente
+                  </span>
+                  <span className="mt-1 block text-xs text-zinc-500">
+                    A finalizacao do pedido so fica disponivel apos esta confirmacao.
+                  </span>
+                </span>
+              </label>
               <button
                 onClick={handleFinish}
-                disabled={isUploadingOrder || (!carrinho.length && !canFinish)}
+                disabled={isUploadingOrder || !isArtworkApproved || (!carrinho.length && !canFinish)}
                 className={`w-full rounded-xl px-6 py-4 font-bold transition-all ${
-                  carrinho.length || canFinish
+                  (carrinho.length || canFinish) && isArtworkApproved
                     ? 'scale-[1.02] bg-zinc-900 text-white shadow-xl active:scale-100 hover:bg-zinc-800'
                     : 'cursor-not-allowed bg-zinc-200 text-zinc-400'
                 }`}

@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocFromServer } from 'firebase/firestore';
@@ -20,7 +22,10 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+
+if (import.meta.env.DEV) {
+  void testConnection();
+}
 
 export enum OperationType {
   CREATE = 'create',
