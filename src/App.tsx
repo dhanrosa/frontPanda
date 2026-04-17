@@ -88,6 +88,11 @@ const MOBILE_LAYOUT_MIN_HEIGHT = 820;
 const MOBILE_HEADER_ESTIMATED_HEIGHT = 84;
 const MOBILE_BOTTOM_BAR_ESTIMATED_HEIGHT = 108;
 const MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT = 48;
+const PANDA_LOGO_URL =
+  'https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png';
+const MAX_LOGO_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+type LogoMode = 'panda' | 'sem_logo' | 'logo_propria';
 
 type ItemCarrinho = {
   id: string;
@@ -128,6 +133,9 @@ export default function App() {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<PhoneModel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [logoMode, setLogoMode] = useState<LogoMode>('panda');
+  const [customLogoFile, setCustomLogoFile] = useState<File | null>(null);
+  const [customLogoPreview, setCustomLogoPreview] = useState<string | null>(null);
 
   const [textOnlyMode, setTextOnlyMode] = useState(false);
   const [isMirrored, setIsMirrored] = useState(false);
@@ -148,6 +156,7 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
+  const customLogoInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const productionRef = useRef<HTMLDivElement>(null);
@@ -503,6 +512,32 @@ export default function App() {
     );
   };
 
+  const getPriceByLogoMode = (mode: LogoMode) => {
+    switch (mode) {
+      case 'panda':
+        return 25.0;
+      case 'sem_logo':
+        return 27.5;
+      case 'logo_propria':
+        return 30.0;
+      default:
+        return 25.0;
+    }
+  };
+
+  const getLogoLabel = (mode: LogoMode) => {
+    switch (mode) {
+      case 'panda':
+        return 'Com logo Panda Cases';
+      case 'sem_logo':
+        return 'Sem logo';
+      case 'logo_propria':
+        return 'Com logo propria';
+      default:
+        return 'Com logo Panda Cases';
+    }
+  };
+
   const loadFile = async (file: File) => {
     const previewFile = await preparePreviewFile(file);
     setOriginalFile(file);
@@ -538,6 +573,62 @@ export default function App() {
         e.target.value = '';
       }
     }
+  };
+
+  const loadCustomLogoFile = async (file: File) => {
+    const fileName = file.name.toLowerCase();
+    const isValidType =
+      file.type === 'image/png' ||
+      file.type === 'image/jpeg' ||
+      fileName.endsWith('.png') ||
+      fileName.endsWith('.jpg') ||
+      fileName.endsWith('.jpeg');
+
+    if (!isValidType) {
+      throw new Error('Envie a logo em PNG, JPG ou JPEG.');
+    }
+
+    if (file.size > MAX_LOGO_UPLOAD_BYTES) {
+      throw new Error('A logo deve ter no maximo 10MB.');
+    }
+
+    const previewFile = await preparePreviewFile(file);
+
+    const preview = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () =>
+        reject(new Error('Nao foi possivel abrir a logo enviada.'));
+      reader.readAsDataURL(previewFile);
+    });
+
+    setCustomLogoFile(previewFile);
+    setCustomLogoPreview(preview);
+  };
+
+  const handleCustomLogoChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await loadCustomLogoFile(file);
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Nao foi possivel abrir a logo enviada.'
+      );
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const clearCustomLogo = () => {
+    setCustomLogoFile(null);
+    setCustomLogoPreview(null);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -596,6 +687,8 @@ export default function App() {
   const resetArtwork = () => {
     clearImage();
     clearText();
+    clearCustomLogo();
+    setLogoMode('panda');
     resetTransform();
     setIsMobileImageEditing(false);
   };
@@ -849,7 +942,7 @@ export default function App() {
     };
   };
 
-  const unitPrice = 25.00;
+  const unitPrice = getPriceByLogoMode(logoMode);
   const totalPrice = unitPrice * quantity;
   const quantidadeItensCarrinho = useMemo(
     () => carrinho.reduce((total, item) => total + item.quantidade, 0),
@@ -877,6 +970,11 @@ export default function App() {
 
     if (!image && !customText.trim()) {
       alert('Envie uma imagem ou adicione um texto para personalizar.');
+      return false;
+    }
+
+    if (logoMode === 'logo_propria' && !customLogoPreview) {
+      alert('Envie a sua logo para continuar.');
       return false;
     }
 
@@ -929,6 +1027,8 @@ export default function App() {
   const resetarEditorParaNovoItem = () => {
     clearImage();
     clearText();
+    clearCustomLogo();
+    setLogoMode('panda');
     resetTransform();
     setQuantity(1);
     setOrderCompleted(false);
@@ -1193,6 +1293,8 @@ ${previewImageUrl}
   const editorTextareaFontSize = getEditorTextareaFontSize(customText, textSize);
   const mobileEditorStrokeSize = getScaledStroke(editorTextareaFontSize);
   const canFinish = Boolean(selectedModel && (image || customText.trim()));
+  const isLogoSelectionValid = logoMode !== 'logo_propria' || Boolean(customLogoPreview);
+  const canSubmitCurrentItem = canFinish && isLogoSelectionValid;
   const totalSteps = 4;
 
   const normalizeSearchValue = (value: string) =>
@@ -1313,8 +1415,8 @@ ${previewImageUrl}
   const canProceedFromStep = () => {
     if (currentStep === 1) return Boolean(selectedBrand);
     if (currentStep === 2) return Boolean(selectedModel);
-    if (currentStep === 3) return canFinish;
-    return canFinish;
+    if (currentStep === 3) return canSubmitCurrentItem;
+    return canSubmitCurrentItem;
   };
 
   const nextStep = () => {
@@ -1378,6 +1480,171 @@ ${previewImageUrl}
   const snapTextToVerticalCenter = (x: number) => {
     const snapDistance = 18;
     return Math.abs(x) <= snapDistance ? 0 : x;
+  };
+
+  const renderCaseLogo = (mobile = false) => {
+    if (logoMode === 'sem_logo') return null;
+
+    const logoSource = logoMode === 'logo_propria' ? customLogoPreview : PANDA_LOGO_URL;
+    if (!logoSource) return null;
+
+    const baseStyle: React.CSSProperties = {
+      position: 'absolute',
+      top: `${(153 / EXPORT_HEIGHT) * 100}%`,
+      right: `${(40 / EXPORT_WIDTH) * 100}%`,
+      width: `${(68 / EXPORT_WIDTH) * 100}%`,
+      height: `${(56 / EXPORT_HEIGHT) * 100}%`,
+      zIndex: 50,
+      opacity: 0.9,
+      pointerEvents: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    };
+
+    return (
+      <div
+        style={mobile ? baseStyle : undefined}
+        className={
+          mobile
+            ? undefined
+            : 'pointer-events-none absolute right-18 top-15 z-50 flex h-14 w-17 items-center justify-center overflow-hidden opacity-90'
+        }
+      >
+        <img
+          src={logoSource}
+          crossOrigin="anonymous"
+          alt={logoMode === 'panda' ? 'Logo Panda Cases' : 'Logo propria do cliente'}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+      </div>
+    );
+  };
+
+  const renderLogoSelector = (mobile = false) => {
+    const options: Array<{
+      mode: LogoMode;
+      title: string;
+      description: string;
+      price: string;
+    }> = [
+      {
+        mode: 'panda',
+        title: 'Usar logo Panda Cases',
+        description: 'Mantem a logo Panda na capinha.',
+        price: 'R$ 25,00',
+      },
+      {
+        mode: 'sem_logo',
+        title: 'Sem logo',
+        description: 'Remove qualquer logo da capinha.',
+        price: 'R$ 27,50',
+      },
+      {
+        mode: 'logo_propria',
+        title: 'Usar minha propria logo',
+        description: 'Envie sua propria logo para aplicar na capinha.',
+        price: 'R$ 30,00',
+      },
+    ];
+
+    return (
+      <section className={mobile ? 'space-y-3' : 'space-y-4'}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+              Logo da capinha
+            </label>
+            <p className="mt-1 text-xs text-zinc-500">
+              Escolha qual logo deve aparecer no mockup e na arte final.
+            </p>
+          </div>
+          <span className="rounded-full bg-[#e4ebe1] px-3 py-1 text-xs font-semibold text-[#435446]">
+            R$ {unitPrice.toFixed(2)}
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {options.map((option) => {
+            const selected = logoMode === option.mode;
+
+            return (
+              <button
+                key={option.mode}
+                type="button"
+                onClick={() => setLogoMode(option.mode)}
+                className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${
+                  selected
+                    ? 'border-[#435446] bg-[#e4ebe1] text-[#435446] shadow-sm'
+                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{option.title}</p>
+                    <p className={`mt-1 text-xs ${selected ? 'text-[#435446]/80' : 'text-zinc-500'}`}>
+                      {option.description}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold">{option.price}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <input
+          ref={customLogoInputRef}
+          type="file"
+          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+          onChange={handleCustomLogoChange}
+          className="hidden"
+        />
+
+        {logoMode === 'logo_propria' && (
+          <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
+            <button
+              type="button"
+              onClick={() => customLogoInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-100"
+            >
+              <Upload className="h-4 w-4" />
+              {customLogoPreview ? 'Trocar logo' : 'Enviar logo'}
+            </button>
+            <p className="mt-2 text-xs text-zinc-500">
+              PNG com transparencia e o formato ideal. JPG e JPEG tambem sao aceitos ate 10MB.
+            </p>
+
+            {customLogoPreview && (
+              <div className="mt-4 flex items-center gap-3">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white p-2">
+                  <img
+                    src={customLogoPreview}
+                    alt="Preview da logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-zinc-800">Logo carregada</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Ela sera aplicada na mesma area da logo Panda Cases.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearCustomLogo}
+                  className="rounded-full border border-zinc-200 p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+    );
   };
 
   const renderModelSelector = (mobile = false) => (
@@ -1617,17 +1884,6 @@ ${previewImageUrl}
       x: position.x * (mobile ? mobileReferenceScale : 1),
       y: position.y * (mobile ? mobileReferenceScale : 1),
     };
-    const pamdaLogoStyle: React.CSSProperties | undefined = mobile
-      ? {
-          top: `${(153 / EXPORT_HEIGHT) * 100}%`,
-          right: `${(40 / EXPORT_WIDTH) * 100}%`,
-          width: `${(17 / EXPORT_WIDTH) * 100}%`,
-          height: 'auto',
-          zIndex: 50,
-          opacity: 0.9,
-        }
-      : undefined;
-
     return (
       <div className="relative">
       <motion.div>
@@ -1809,15 +2065,7 @@ ${previewImageUrl}
             />
           )}
 
-          <img
-            src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
-            crossOrigin="anonymous"
-            alt="Pamda"
-            className={`pointer-events-none absolute ${
-              mobile ? '' : 'right-18 top-15 z-50 w-16 opacity-90'
-            }`}
-            style={pamdaLogoStyle}
-          />
+          {renderCaseLogo(mobile)}
         </div>
       </motion.div>
 
@@ -1866,6 +2114,9 @@ ${previewImageUrl}
         </p>
         <p>
           <strong>Imagem:</strong> {image ? 'Adicionada' : 'Nao adicionada'}
+        </p>
+        <p>
+          <strong>Logo:</strong> {getLogoLabel(logoMode)}
         </p>
       </div>
 
@@ -3207,6 +3458,7 @@ ${previewImageUrl}
                     >
                       {image || customText.trim() ? 'Use foto e texto com foco total no preview.' : 'Adicione uma foto, um texto ou os dois.'}
                     </div>
+                    <div className="mt-3">{renderLogoSelector(true)}</div>
                     {image && (
                       <button type="button" onClick={clearImage} className="mx-auto mt-2.5 flex items-center gap-2 text-sm font-semibold text-red-600">
                         <X className="h-4 w-4" />
@@ -3218,7 +3470,7 @@ ${previewImageUrl}
                 {renderMobileBottomBar({
                   onPrimary: nextStep,
                   primaryLabel: 'Avancar',
-                  primaryDisabled: !canFinish,
+                  primaryDisabled: !canSubmitCurrentItem,
                   showReset: true,
                   onReset: handleStepReset,
                 })}
@@ -3250,13 +3502,13 @@ ${previewImageUrl}
                       Pedido pronto para envio no WhatsApp!
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={adicionarItemAoCarrinho}
-                    disabled={isUploadingOrder || !canFinish}
-                    className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Adicionar ao carrinho e fazer outra
+              <button
+                type="button"
+                onClick={adicionarItemAoCarrinho}
+                disabled={isUploadingOrder || !canSubmitCurrentItem}
+                className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Adicionar ao carrinho e fazer outra
                   </button>
                   <label className="flex items-start gap-3 rounded-[22px] border border-[#6d7b6b]/15 bg-white px-4 py-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
                     <input
@@ -3359,6 +3611,7 @@ ${previewImageUrl}
                   Resetar arte
                 </button>
               </section>
+              {renderLogoSelector()}
               <AnimatePresence>
                 {image && (
                   <motion.div
@@ -3725,7 +3978,7 @@ ${previewImageUrl}
               <button
                 type="button"
                 onClick={adicionarItemAoCarrinho}
-                disabled={isUploadingOrder || !canFinish}
+                disabled={isUploadingOrder || !canSubmitCurrentItem}
                 className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-6 py-4 font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <span className="flex items-center justify-center gap-2">
