@@ -2371,6 +2371,17 @@ ${previewImageUrl}
       <div className="flex h-full min-h-0 flex-col">
         {renderOrderSummary()}
         <div className="mt-auto space-y-2.5 pt-3">
+          <button
+            type="button"
+            onClick={adicionarItemAoCarrinho}
+            disabled={isUploadingOrder || !canSubmitApprovedItem}
+            className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-5 py-3 text-sm font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Plus className="h-4 w-4" />
+              Adicionar ao carrinho e fazer outra
+            </span>
+          </button>
           <label className="flex items-start gap-3 rounded-xl border border-[#6d7b6b]/15 bg-white px-4 py-2.5 text-left shadow-sm">
             <input
               type="checkbox"
@@ -2387,17 +2398,6 @@ ${previewImageUrl}
               </span>
             </span>
           </label>
-          <button
-            type="button"
-            onClick={adicionarItemAoCarrinho}
-            disabled={isUploadingOrder || !canSubmitApprovedItem}
-            className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-5 py-3 text-sm font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <span className="flex items-center justify-center gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar ao carrinho e fazer outra
-            </span>
-          </button>
           <button
             onClick={handleFinish}
             disabled={isUploadingOrder || !isArtworkApproved || (!carrinho.length && !canFinish)}
@@ -3797,14 +3797,6 @@ ${previewImageUrl}
                       Pedido pronto para envio no WhatsApp!
                     </div>
                   )}
-              <button
-                type="button"
-                onClick={adicionarItemAoCarrinho}
-                disabled={isUploadingOrder || !canSubmitApprovedItem}
-                className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Adicionar ao carrinho e fazer outra
-                  </button>
                   <label className="flex items-start gap-3 rounded-[22px] border border-[#6d7b6b]/15 bg-white px-4 py-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
                     <input
                       type="checkbox"
@@ -3821,6 +3813,14 @@ ${previewImageUrl}
                       </span>
                     </span>
                   </label>
+              <button
+                type="button"
+                onClick={adicionarItemAoCarrinho}
+                disabled={isUploadingOrder || !canSubmitApprovedItem}
+                className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Adicionar ao carrinho e fazer outra
+                  </button>
                 </section>
                 {renderMobileBottomBar({
                   onPrimary: handleFinish,
