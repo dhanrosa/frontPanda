@@ -90,9 +90,6 @@ const MOBILE_BOTTOM_BAR_ESTIMATED_HEIGHT = 108;
 const MOBILE_STEP_PROGRESS_ESTIMATED_HEIGHT = 48;
 const PANDA_LOGO_URL =
   'https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png';
-const MAX_LOGO_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-type LogoMode = 'panda' | 'sem_logo' | 'logo_propria';
 
 type ItemCarrinho = {
   id: string;
@@ -133,9 +130,6 @@ export default function App() {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<PhoneModel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [logoMode, setLogoMode] = useState<LogoMode>('panda');
-  const [customLogoFile, setCustomLogoFile] = useState<File | null>(null);
-  const [customLogoPreview, setCustomLogoPreview] = useState<string | null>(null);
 
   const [textOnlyMode, setTextOnlyMode] = useState(false);
   const [isMirrored, setIsMirrored] = useState(false);
@@ -156,7 +150,6 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
-  const customLogoInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const productionRef = useRef<HTMLDivElement>(null);
@@ -182,6 +175,9 @@ export default function App() {
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [isArtworkApproved, setIsArtworkApproved] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [desktopStep, setDesktopStep] = useState(1);
+  const [skipTextStep, setSkipTextStep] = useState(false);
+  const [imageResetKey, setImageResetKey] = useState(0);
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [mobileBrandSearchQuery, setMobileBrandSearchQuery] = useState('');
   const [isBrandSearchMode, setIsBrandSearchMode] = useState(false);
@@ -512,32 +508,6 @@ export default function App() {
     );
   };
 
-  const getPriceByLogoMode = (mode: LogoMode) => {
-    switch (mode) {
-      case 'panda':
-        return 25.0;
-      case 'sem_logo':
-        return 27.5;
-      case 'logo_propria':
-        return 30.0;
-      default:
-        return 25.0;
-    }
-  };
-
-  const getLogoLabel = (mode: LogoMode) => {
-    switch (mode) {
-      case 'panda':
-        return 'Com logo Panda Cases';
-      case 'sem_logo':
-        return 'Sem logo';
-      case 'logo_propria':
-        return 'Com logo propria';
-      default:
-        return 'Com logo Panda Cases';
-    }
-  };
-
   const loadFile = async (file: File) => {
     const previewFile = await preparePreviewFile(file);
     setOriginalFile(file);
@@ -573,62 +543,6 @@ export default function App() {
         e.target.value = '';
       }
     }
-  };
-
-  const loadCustomLogoFile = async (file: File) => {
-    const fileName = file.name.toLowerCase();
-    const isValidType =
-      file.type === 'image/png' ||
-      file.type === 'image/jpeg' ||
-      fileName.endsWith('.png') ||
-      fileName.endsWith('.jpg') ||
-      fileName.endsWith('.jpeg');
-
-    if (!isValidType) {
-      throw new Error('Envie a logo em PNG, JPG ou JPEG.');
-    }
-
-    if (file.size > MAX_LOGO_UPLOAD_BYTES) {
-      throw new Error('A logo deve ter no maximo 10MB.');
-    }
-
-    const previewFile = await preparePreviewFile(file);
-
-    const preview = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () =>
-        reject(new Error('Nao foi possivel abrir a logo enviada.'));
-      reader.readAsDataURL(previewFile);
-    });
-
-    setCustomLogoFile(previewFile);
-    setCustomLogoPreview(preview);
-  };
-
-  const handleCustomLogoChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      await loadCustomLogoFile(file);
-    } catch (error) {
-      console.error(error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Nao foi possivel abrir a logo enviada.'
-      );
-    } finally {
-      e.target.value = '';
-    }
-  };
-
-  const clearCustomLogo = () => {
-    setCustomLogoFile(null);
-    setCustomLogoPreview(null);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -687,8 +601,7 @@ export default function App() {
   const resetArtwork = () => {
     clearImage();
     clearText();
-    clearCustomLogo();
-    setLogoMode('panda');
+    setSkipTextStep(false);
     resetTransform();
     setIsMobileImageEditing(false);
   };
@@ -942,7 +855,7 @@ export default function App() {
     };
   };
 
-  const unitPrice = getPriceByLogoMode(logoMode);
+  const unitPrice = 25.0;
   const totalPrice = unitPrice * quantity;
   const quantidadeItensCarrinho = useMemo(
     () => carrinho.reduce((total, item) => total + item.quantidade, 0),
@@ -970,11 +883,6 @@ export default function App() {
 
     if (!image && !customText.trim()) {
       alert('Envie uma imagem ou adicione um texto para personalizar.');
-      return false;
-    }
-
-    if (logoMode === 'logo_propria' && !customLogoPreview) {
-      alert('Envie a sua logo para continuar.');
       return false;
     }
 
@@ -1027,8 +935,6 @@ export default function App() {
   const resetarEditorParaNovoItem = () => {
     clearImage();
     clearText();
-    clearCustomLogo();
-    setLogoMode('panda');
     resetTransform();
     setQuantity(1);
     setOrderCompleted(false);
@@ -1039,6 +945,8 @@ export default function App() {
     setIsBrandSearchMode(false);
     setIsMobileImageEditing(false);
     setIsMobileTextModalOpen(false);
+    setDesktopStep(1);
+    setSkipTextStep(false);
   };
 
   const voltarParaPrimeiraEtapa = () => {
@@ -1256,7 +1164,12 @@ ${previewImageUrl}
   const handleCustomTextChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>
   ) => {
-    setCustomText(e.target.value.slice(0, MAX_CUSTOM_TEXT_LENGTH));
+    const nextValue = e.target.value.slice(0, MAX_CUSTOM_TEXT_LENGTH);
+    setCustomText(nextValue);
+
+    if (nextValue.trim()) {
+      setSkipTextStep(false);
+    }
   };
 
   const getEditorTextareaFontSize = (value: string, baseSize: number) => {
@@ -1293,8 +1206,8 @@ ${previewImageUrl}
   const editorTextareaFontSize = getEditorTextareaFontSize(customText, textSize);
   const mobileEditorStrokeSize = getScaledStroke(editorTextareaFontSize);
   const canFinish = Boolean(selectedModel && (image || customText.trim()));
-  const isLogoSelectionValid = logoMode !== 'logo_propria' || Boolean(customLogoPreview);
-  const canSubmitCurrentItem = canFinish && isLogoSelectionValid;
+  const canSubmitCurrentItem = canFinish;
+  const canSubmitApprovedItem = canSubmitCurrentItem && isArtworkApproved;
   const totalSteps = 4;
 
   const normalizeSearchValue = (value: string) =>
@@ -1482,16 +1395,11 @@ ${previewImageUrl}
     return Math.abs(x) <= snapDistance ? 0 : x;
   };
 
-  const renderCaseLogo = (mobile = false) => {
-    if (logoMode === 'sem_logo') return null;
-
-    const logoSource = logoMode === 'logo_propria' ? customLogoPreview : PANDA_LOGO_URL;
-    if (!logoSource) return null;
-
-    const baseStyle: React.CSSProperties = {
+  const renderCaseLogo = () => {
+    const logoStyle: React.CSSProperties = {
       position: 'absolute',
-      top: `${(153 / EXPORT_HEIGHT) * 100}%`,
-      right: `${(40 / EXPORT_WIDTH) * 100}%`,
+      top: `${(40/ EXPORT_HEIGHT) * 100}%`,
+      right: `${(72 / EXPORT_WIDTH) * 100}%`,
       width: `${(68 / EXPORT_WIDTH) * 100}%`,
       height: `${(56 / EXPORT_HEIGHT) * 100}%`,
       zIndex: 50,
@@ -1504,18 +1412,11 @@ ${previewImageUrl}
     };
 
     return (
-      <div
-        style={mobile ? baseStyle : undefined}
-        className={
-          mobile
-            ? undefined
-            : 'pointer-events-none absolute right-18 top-15 z-50 flex h-14 w-17 items-center justify-center overflow-hidden opacity-90'
-        }
-      >
+      <div style={logoStyle}>
         <img
-          src={logoSource}
+          src={PANDA_LOGO_URL}
           crossOrigin="anonymous"
-          alt={logoMode === 'panda' ? 'Logo Panda Cases' : 'Logo propria do cliente'}
+          alt="Logo Panda Cases"
           className="h-full w-full object-contain"
           draggable={false}
         />
@@ -1523,132 +1424,8 @@ ${previewImageUrl}
     );
   };
 
-  const renderLogoSelector = (mobile = false) => {
-    const options: Array<{
-      mode: LogoMode;
-      title: string;
-      description: string;
-      price: string;
-    }> = [
-      {
-        mode: 'panda',
-        title: 'Usar logo Panda Cases',
-        description: 'Mantem a logo Panda na capinha.',
-        price: 'R$ 25,00',
-      },
-      {
-        mode: 'sem_logo',
-        title: 'Sem logo',
-        description: 'Remove qualquer logo da capinha.',
-        price: 'R$ 27,50',
-      },
-      {
-        mode: 'logo_propria',
-        title: 'Usar minha propria logo',
-        description: 'Envie sua propria logo para aplicar na capinha.',
-        price: 'R$ 30,00',
-      },
-    ];
-
-    return (
-      <section className={mobile ? 'space-y-3' : 'space-y-4'}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-              Logo da capinha
-            </label>
-            <p className="mt-1 text-xs text-zinc-500">
-              Escolha qual logo deve aparecer no mockup e na arte final.
-            </p>
-          </div>
-          <span className="rounded-full bg-[#e4ebe1] px-3 py-1 text-xs font-semibold text-[#435446]">
-            R$ {unitPrice.toFixed(2)}
-          </span>
-        </div>
-
-        <div className="space-y-2">
-          {options.map((option) => {
-            const selected = logoMode === option.mode;
-
-            return (
-              <button
-                key={option.mode}
-                type="button"
-                onClick={() => setLogoMode(option.mode)}
-                className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${
-                  selected
-                    ? 'border-[#435446] bg-[#e4ebe1] text-[#435446] shadow-sm'
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{option.title}</p>
-                    <p className={`mt-1 text-xs ${selected ? 'text-[#435446]/80' : 'text-zinc-500'}`}>
-                      {option.description}
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold">{option.price}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <input
-          ref={customLogoInputRef}
-          type="file"
-          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
-          onChange={handleCustomLogoChange}
-          className="hidden"
-        />
-
-        {logoMode === 'logo_propria' && (
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
-            <button
-              type="button"
-              onClick={() => customLogoInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-100"
-            >
-              <Upload className="h-4 w-4" />
-              {customLogoPreview ? 'Trocar logo' : 'Enviar logo'}
-            </button>
-            <p className="mt-2 text-xs text-zinc-500">
-              PNG com transparencia e o formato ideal. JPG e JPEG tambem sao aceitos ate 10MB.
-            </p>
-
-            {customLogoPreview && (
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white p-2">
-                  <img
-                    src={customLogoPreview}
-                    alt="Preview da logo"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-zinc-800">Logo carregada</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Ela sera aplicada na mesma area da logo Panda Cases.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearCustomLogo}
-                  className="rounded-full border border-zinc-200 p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    );
-  };
-
   const renderModelSelector = (mobile = false) => (
-    <section className="space-y-4">
+    <section className={mobile ? 'space-y-4' : 'space-y-3.5'}>
       {!mobile && (
         <>
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
@@ -1662,23 +1439,25 @@ ${previewImageUrl}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Pesquisar modelo"
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm text-zinc-700 outline-none transition-all focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-3 pl-10 pr-4 text-[15px] text-zinc-700 outline-none transition-all focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+      <div className={`flex gap-2 overflow-x-auto custom-scrollbar ${mobile ? 'pb-2' : 'pb-1'}`}>
         {brands.map((brand) => (
           <button
             key={brand}
             onClick={() => selectBrand(brand)}
-            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all ${
+            className={`whitespace-nowrap rounded-full font-medium transition-all ${
               selectedBrand === brand
                 ? mobile
-                  ? 'bg-zinc-900 text-white shadow-md'
-                  : 'bg-indigo-600 text-white shadow-md'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  ? 'bg-zinc-900 px-4 py-2 text-sm text-white shadow-md'
+                  : 'bg-indigo-600 px-3.5 py-2 text-sm text-white shadow-md'
+                : mobile
+                  ? 'bg-zinc-100 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-200'
+                  : 'bg-zinc-100 px-3.5 py-2 text-sm text-zinc-600 hover:bg-zinc-200'
             }`}
           >
             {brand}
@@ -1688,7 +1467,7 @@ ${previewImageUrl}
 
       <div
         className={`grid grid-cols-1 gap-2 overflow-y-auto custom-scrollbar ${
-          mobile ? 'max-h-44 pr-1' : 'max-h-48 pr-2'
+          mobile ? 'max-h-44 pr-1' : 'max-h-40 pr-2'
         }`}
       >
         {filteredModels.map((model) => {
@@ -1701,20 +1480,22 @@ ${previewImageUrl}
                 setSelectedBrand(model.brand);
                 setSelectedModel(model);
               }}
-              className={`flex items-center justify-between rounded-xl border p-3 text-left transition-all ${
+              className={`flex items-center justify-between rounded-xl border text-left transition-all ${
                 mobile
                   ? selected
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-200 bg-white text-zinc-700'
+                    ? 'border-zinc-900 bg-zinc-900 p-3 text-white'
+                    : 'border-zinc-200 bg-white p-3 text-zinc-700'
                   : selected
-                    ? 'border border-indigo-200 bg-indigo-50 text-indigo-700'
-                    : 'border border-zinc-100 bg-white text-zinc-700 hover:border-zinc-300'
+                    ? 'border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-indigo-700'
+                    : 'border border-zinc-100 bg-white px-3 py-2.5 text-zinc-700 hover:border-zinc-300'
               }`}
             >
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{model.name}</span>
+                <span className={`${mobile ? 'text-sm' : 'text-[15px]'} font-medium`}>
+                  {model.name}
+                </span>
                 {searchQuery.trim() && (
-                  <span className={`text-[11px] ${selected ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                  <span className={`text-xs ${selected ? 'text-zinc-300' : 'text-zinc-400'}`}>
                     {model.brand}
                   </span>
                 )}
@@ -1740,7 +1521,7 @@ ${previewImageUrl}
                 ? 'border-zinc-900 bg-zinc-100'
                 : 'border-zinc-300 bg-white hover:border-zinc-400'
             }`
-          : `group flex flex-col items-center justify-center gap-3 rounded-2xl p-6 ${
+          : `group flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 ${
               isDragging
                 ? 'border-indigo-500 bg-indigo-50/50'
                 : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'
@@ -1759,17 +1540,17 @@ ${previewImageUrl}
         className={`mx-auto flex items-center justify-center rounded-full bg-zinc-100 ${
           mobile
             ? 'h-14 w-14'
-            : 'h-10 w-10 transition-transform group-hover:scale-110'
+            : 'h-7 w-7 transition-transform group-hover:scale-110'
         }`}
       >
-        <Upload className={`${mobile ? 'h-6 w-6 text-zinc-700' : 'h-5 w-5 text-zinc-500'}`} />
+        <Upload className={`${mobile ? 'h-6 w-6 text-zinc-700' : 'h-4 w-4 text-zinc-500'}`} />
       </div>
 
       <div className={mobile ? 'mt-4' : ''}>
-        <p className={`${mobile ? 'text-base' : 'text-sm'} font-medium text-zinc-700`}>
+        <p className={`${mobile ? 'text-base' : 'text-xs'} font-medium text-zinc-700`}>
           {mobile ? 'Toque para enviar sua imagem' : 'Carregar Foto'}
         </p>
-        <p className={`${mobile ? 'mt-1 text-sm' : 'mt-1 text-xs'} text-zinc-400`}>
+        <p className={`${mobile ? 'mt-1 text-sm' : 'text-[11px]'} text-zinc-400`}>
           {mobile
             ? 'PNG ou JPG. Depois disso abrimos os ajustes automaticamente.'
             : 'PNG, JPG ate 10MB'}
@@ -1922,6 +1703,7 @@ ${previewImageUrl}
               }}
             >
               <motion.div
+                key={`image-transform-${imageResetKey}`}
                 drag={imageInteractive}
                 dragConstraints={dragLimits}
                 dragElastic={0}
@@ -2065,7 +1847,7 @@ ${previewImageUrl}
             />
           )}
 
-          {renderCaseLogo(mobile)}
+          {renderCaseLogo()}
         </div>
       </motion.div>
 
@@ -2099,10 +1881,10 @@ ${previewImageUrl}
   };
 
   const renderOrderSummary = () => (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-bold text-zinc-800">Resumo do pedido</h3>
+    <div className="flex-1 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-2 text-sm font-bold text-zinc-800">Resumo do pedido</h3>
 
-      <div className="space-y-2 text-sm text-zinc-600">
+      <div className="space-y-1.5 text-sm text-zinc-600">
         <p>
           <strong>Modelo:</strong> {selectedModel?.name || 'Nao selecionado'}
         </p>
@@ -2115,13 +1897,10 @@ ${previewImageUrl}
         <p>
           <strong>Imagem:</strong> {image ? 'Adicionada' : 'Nao adicionada'}
         </p>
-        <p>
-          <strong>Logo:</strong> {getLogoLabel(logoMode)}
-        </p>
       </div>
 
-      <div className="mt-4">
-        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+      <div className="mt-3">
+        <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
           Quantidade
         </label>
 
@@ -2129,26 +1908,26 @@ ${previewImageUrl}
           <button
             type="button"
             onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-            className="h-10 w-10 rounded-xl bg-zinc-100 font-bold text-zinc-700 transition-colors hover:bg-zinc-200"
+            className="h-9 w-9 rounded-xl bg-zinc-100 font-bold text-zinc-700 transition-colors hover:bg-zinc-200"
           >
             -
           </button>
 
-          <div className="flex h-10 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-sm font-bold text-zinc-800">
+          <div className="flex h-9 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-sm font-bold text-zinc-800">
             {quantity}
           </div>
 
           <button
             type="button"
             onClick={() => setQuantity((prev) => prev + 1)}
-            className="h-10 w-10 rounded-xl bg-zinc-100 font-bold text-zinc-700 transition-colors hover:bg-zinc-200"
+            className="h-9 w-9 rounded-xl bg-zinc-100 font-bold text-zinc-700 transition-colors hover:bg-zinc-200"
           >
             +
           </button>
         </div>
       </div>
 
-      <div className="mt-4 space-y-1 border-t border-zinc-100 pt-4 text-sm">
+      <div className="mt-3 space-y-1 border-t border-zinc-100 pt-3 text-sm">
         <p className="flex justify-between text-zinc-600">
           <span>Valor unitario</span>
           <strong>R$ {unitPrice.toFixed(2)}</strong>
@@ -2157,6 +1936,523 @@ ${previewImageUrl}
           <span>Total</span>
           <span>R$ {totalPrice.toFixed(2)}</span>
         </p>
+      </div>
+    </div>
+  );
+
+  const desktopStepConfig = [
+    { step: 1, title: 'Modelo e imagem', description: 'Escolha o aparelho e envie a foto.' },
+    { step: 2, title: 'Texto', description: 'Edite o texto ou marque que nao vai inserir.' },
+    { step: 3, title: 'Resumo', description: 'Revise, adicione ao carrinho ou finalize.' },
+  ] as const;
+
+  const canAdvanceDesktopStep1 = Boolean(selectedModel && image);
+  const canAdvanceDesktopStep2 = skipTextStep || Boolean(customText.trim());
+
+  const goToNextDesktopStep = () => {
+    if (desktopStep === 1 && !canAdvanceDesktopStep1) return;
+    if (desktopStep === 2 && !canAdvanceDesktopStep2) return;
+    setDesktopStep((prev) => Math.min(3, prev + 1));
+  };
+
+  const goToPrevDesktopStep = () => {
+    setDesktopStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const renderDesktopImageControlsPanel = () => {
+    if (!image) return null;
+
+    return (
+      <div className="w-full max-w-[320px] shrink-0 rounded-[32px] border border-zinc-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">
+            Ajustes da imagem
+          </label>
+          <span className="text-[10px] font-mono text-zinc-500">Zoom: {activeZoom}%</span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-4 gap-2">
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="flex rounded-lg bg-zinc-100 p-1">
+              <button
+                onClick={() => setZoom(Math.max(100, zoom - 10))}
+                className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setZoom(Math.min(300, zoom + 10))}
+                className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+            </div>
+            <span className="text-[9px] font-bold uppercase text-zinc-400">Zoom</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => setIsMirrored(!isMirrored)}
+              className={`rounded-lg p-2.5 transition-all ${
+                isMirrored
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              <FlipHorizontal className="h-4 w-4" />
+            </button>
+            <span className="text-[9px] font-bold uppercase text-zinc-400">Espelhar</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => setImageRotation((prev) => (prev - 90) % 360)}
+              className="rounded-lg bg-zinc-100 p-2.5 text-zinc-600 transition-all hover:bg-zinc-200"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+            <span className="text-[9px] font-bold uppercase text-zinc-400">Girar anti</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
+              className="rounded-lg bg-zinc-100 p-2.5 text-zinc-600 transition-all hover:bg-zinc-200"
+            >
+              <RotateCw className="h-4 w-4" />
+            </button>
+            <span className="text-[9px] font-bold uppercase text-zinc-400">Girar hor</span>
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <input
+            type="range"
+            min="100"
+            max="300"
+            value={activeZoom}
+            onChange={(e) => setZoom(parseInt(e.target.value))}
+            className="w-full accent-indigo-600"
+          />
+        </div>
+
+        <section className="mt-5">
+          <label className="mb-3 block text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">
+            Ajuste de posicao
+          </label>
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => moveImage('up')}
+              className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+            >
+              <ChevronUp className="h-5 w-5" />
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => moveImage('left')}
+                className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPosition({ x: 0, y: 0 });
+                  setZoom(100);
+                  setImageResetKey((prev) => prev + 1);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition-colors hover:bg-zinc-100"
+                title="Centralizar imagem"
+              >
+                <Move className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => moveImage('right')}
+                className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            <button
+              onClick={() => moveImage('down')}
+              className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-zinc-500">
+            Se preferir, voce pode usar o mouse para arrastar a imagem.
+          </p>
+        </section>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={clearImage}
+            className="rounded-xl border border-zinc-200 p-2.5 text-zinc-400 transition-all hover:bg-red-50 hover:text-red-500"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDesktopSidebarContent = () => {
+    if (desktopStep === 1) {
+      return (
+        <div className="flex h-full min-h-0 flex-col space-y-3">
+          {renderModelSelector()}
+
+          <section className="mt-auto rounded-2xl border border-zinc-200/70 bg-white/70 p-3 shadow-sm">
+            <label className="mb-2 block text-sm font-bold uppercase tracking-wider text-zinc-400">
+              Sua imagem
+            </label>
+            {renderUploadCard()}
+            <p className="mt-2 text-xs leading-tight text-zinc-500">
+              Depois do upload, os ajustes da imagem aparecem no painel branco ao lado do preview.
+            </p>
+            <button
+              type="button"
+              onClick={resetArtwork}
+              disabled={!image && !customText.trim()}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-base font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Resetar arte
+            </button>
+          </section>
+        </div>
+      );
+    }
+
+    if (desktopStep === 2) {
+      return (
+        <section className="flex h-full min-h-0 flex-col space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+              Personalizar texto
+            </label>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setTextRotation((prev) => (prev - 45) % 360)}
+                className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 transition-colors hover:bg-zinc-200"
+                title="Girar Anti-horario"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setTextRotation((prev) => (prev + 45) % 360)}
+                className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 transition-colors hover:bg-zinc-200"
+                title="Girar Horario"
+              >
+                <RotateCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
+            <input
+              type="checkbox"
+              checked={skipTextStep}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setSkipTextStep(checked);
+                if (checked) {
+                  clearText();
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#435446] focus:ring-[#435446]"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-zinc-800">
+                Nao inserir texto nesta capinha
+              </span>
+              <span className="mt-1 block text-xs text-zinc-500">
+                Marque esta opcao para seguir sem personalizacao de texto.
+              </span>
+            </span>
+          </label>
+
+          {!skipTextStep && (
+            <div className="space-y-3">
+              <div className="mb-1 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="textOnly"
+                  checked={textOnlyMode}
+                  onChange={(e) => setTextOnlyMode(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <label
+                  htmlFor="textOnly"
+                  className="cursor-pointer text-xs font-medium text-zinc-600"
+                >
+                  Modo Somente Texto (Ocultar Foto)
+                </label>
+              </div>
+
+              <div className="relative">
+                <Type className="absolute left-3 top-3 h-4 w-4 text-zinc-400" />
+                <textarea
+                  placeholder="Escreva seu texto..."
+                  value={customText}
+                  onChange={handleCustomTextChange}
+                  maxLength={MAX_CUSTOM_TEXT_LENGTH}
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBold(!isBold)}
+                  className={`rounded p-2 ${
+                    isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Bold className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsItalic(!isItalic)}
+                  className={`rounded p-2 ${
+                    isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Italic className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsUnderline(!isUnderline)}
+                  className={`rounded p-2 ${
+                    isUnderline ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
+                  }`}
+                >
+                  <Underline className="h-4 w-4" />
+                </button>
+                <div className="mx-1 h-3 w-px bg-zinc-300" />
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-zinc-800">Espacamento</span>
+                  <button
+                    type="button"
+                    onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
+                    className="rounded bg-zinc-100 px-3 py-1 text-xs"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center text-xs">{letterSpacing}</span>
+                  <button
+                    type="button"
+                    onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
+                    className="rounded bg-zinc-100 px-3 py-1 text-xs"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-400">Fonte</label>
+                  <select
+                    value={textFont}
+                    onChange={(e) => setTextFont(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {GOOGLE_FONTS.map((font) => (
+                      <option
+                        key={font.name}
+                        value={font.value}
+                        style={{ fontFamily: font.value }}
+                      >
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-400">
+                    Tamanho
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTextSize((prev) => Math.max(8, prev - 2))}
+                      className="rounded-lg bg-zinc-100 px-3 py-2 text-zinc-700 hover:bg-zinc-200"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      value={textSize}
+                      onChange={(e) =>
+                        setTextSize(Math.max(8, parseInt(e.target.value) || 12))
+                      }
+                      className="no-spinner w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-center text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTextSize((prev) => Math.min(200, prev + 2))}
+                      className="rounded-lg bg-zinc-100 px-3 py-2 text-zinc-700 hover:bg-zinc-200"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-zinc-400">Cor</label>
+                <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+                      title="Escolher cor do texto"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-zinc-600">Cor do texto</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div
+                          className="h-5 w-5 rounded-full border border-zinc-300"
+                          style={{ backgroundColor: textColor }}
+                        />
+                        <input
+                          type="text"
+                          value={textColor}
+                          onChange={(e) => setTextColor(e.target.value)}
+                          className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={textStrokeColor}
+                      onChange={(e) => setTextStrokeColor(e.target.value)}
+                      className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
+                      title="Cor da borda"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-zinc-600">
+                        Cor e espessura da borda
+                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="0"
+                          max="8"
+                          value={textStroke}
+                          onChange={(e) => setTextStroke(parseInt(e.target.value))}
+                          className="w-full"
+                        />
+                        <span className="w-8 text-center text-xs text-zinc-600">
+                          {textStroke}px
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      );
+    }
+
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {renderOrderSummary()}
+        <div className="mt-auto space-y-2.5 pt-3">
+          <label className="flex items-start gap-3 rounded-xl border border-[#6d7b6b]/15 bg-white px-4 py-2.5 text-left shadow-sm">
+            <input
+              type="checkbox"
+              checked={isArtworkApproved}
+              onChange={(e) => setIsArtworkApproved(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#435446] focus:ring-[#435446]"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-zinc-800">
+                Arte aprovada pelo cliente
+              </span>
+              <span className="mt-0.5 block text-xs text-zinc-500">
+                A finalizacao do pedido so fica disponivel apos esta confirmacao.
+              </span>
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={adicionarItemAoCarrinho}
+            disabled={isUploadingOrder || !canSubmitApprovedItem}
+            className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-5 py-3 text-sm font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Plus className="h-4 w-4" />
+              Adicionar ao carrinho e fazer outra
+            </span>
+          </button>
+          <button
+            onClick={handleFinish}
+            disabled={isUploadingOrder || !isArtworkApproved || (!carrinho.length && !canFinish)}
+            className={`w-full rounded-xl px-5 py-3 text-sm font-bold transition-all ${
+              (carrinho.length || canFinish) && isArtworkApproved
+                ? 'scale-[1.02] bg-zinc-900 text-white shadow-xl active:scale-100 hover:bg-zinc-800'
+                : 'cursor-not-allowed bg-zinc-200 text-zinc-400'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Download className="h-4 w-4" />
+              {isUploadingOrder ? 'Enviando imagens...' : 'Finalizar Pedido'}
+            </span>
+          </button>
+          {orderCompleted && (
+            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-center text-sm font-medium text-green-700">
+              Pedido pronto para envio no WhatsApp!
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDesktopStepFooter = () => (
+    <div className="border-t border-zinc-100 bg-zinc-50/70 px-6 py-4">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={goToPrevDesktopStep}
+          disabled={desktopStep === 1}
+          className="min-h-11 flex-1 rounded-[18px] border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Voltar
+        </button>
+        {desktopStep < 3 ? (
+          <button
+            type="button"
+            onClick={goToNextDesktopStep}
+            disabled={
+              desktopStep === 1 ? !canAdvanceDesktopStep1 : !canAdvanceDesktopStep2
+            }
+            className="min-h-11 flex-1 rounded-[18px] bg-[#435446] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(67,84,70,0.2)] transition-all hover:bg-[#39493b] disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:shadow-none"
+          >
+            Avancar
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={resetArtwork}
+            className="min-h-11 flex-1 rounded-[18px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 text-sm font-semibold text-[#435446] transition-colors hover:bg-[#dbe4d8]"
+          >
+            Resetar arte
+          </button>
+        )}
       </div>
     </div>
   );
@@ -3458,7 +3754,6 @@ ${previewImageUrl}
                     >
                       {image || customText.trim() ? 'Use foto e texto com foco total no preview.' : 'Adicione uma foto, um texto ou os dois.'}
                     </div>
-                    <div className="mt-3">{renderLogoSelector(true)}</div>
                     {image && (
                       <button type="button" onClick={clearImage} className="mx-auto mt-2.5 flex items-center gap-2 text-sm font-semibold text-red-600">
                         <X className="h-4 w-4" />
@@ -3505,7 +3800,7 @@ ${previewImageUrl}
               <button
                 type="button"
                 onClick={adicionarItemAoCarrinho}
-                disabled={isUploadingOrder || !canSubmitCurrentItem}
+                disabled={isUploadingOrder || !canSubmitApprovedItem}
                 className="rounded-[22px] border border-[#6d7b6b]/15 bg-[#e4ebe1] px-4 py-3 text-sm font-semibold text-[#435446] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Adicionar ao carrinho e fazer outra
@@ -3578,449 +3873,53 @@ ${previewImageUrl}
         </div>
       ) : (
         <div className="flex min-h-[100dvh] flex-col xl:flex-row">
-          <aside className="z-10 flex w-full flex-col overflow-y-auto border-b border-zinc-200 bg-bamboo xl:max-h-[100dvh] xl:w-96 xl:border-b-0 xl:border-r">
-            <div className="border-b border-zinc-100/50 p-8 text-center">
-              <div className="mb-5 flex justify-end">{renderBotaoCarrinho()}</div>
-              <div className="mb-4">
+          <aside className="z-10 flex w-full flex-col overflow-hidden border-b border-zinc-200 bg-bamboo xl:h-[100dvh] xl:w-96 xl:border-b-0 xl:border-r">
+            <div className="sticky top-0 z-20 border-b border-zinc-100/50 bg-bamboo/95 px-8 py-1.5 text-center backdrop-blur">
+              <div className="mb-1 flex justify-end">{renderBotaoCarrinho()}</div>
+              <div className="mb-0">
                 <img
                   src="https://res.cloudinary.com/dwexdk5pp/image/upload/v1773958801/logo_pamda_te76in.png"
                   alt="Logo Pamda Cases"
-                  className="mx-auto h-auto w-[250px]"
+                  className="mx-auto h-auto w-[200px]"
                 />
               </div>
-              <h2 className="font-lexend text-[17px] font-bold text-zinc-800">
+              <h2 className="font-lexend text-[15px] font-bold text-zinc-800">
                 Sua capinha, do seu jeito!
               </h2>
             </div>
 
-            <div className="flex-1 space-y-8 bg-white/40 p-6 backdrop-blur-sm">
-              {renderModelSelector()}
-
-              <section>
-                <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  Sua Imagem
-                </label>
-                {renderUploadCard()}
-                <button
-                  type="button"
-                  onClick={resetArtwork}
-                  disabled={!image && !customText.trim()}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Resetar arte
-                </button>
-              </section>
-              {renderLogoSelector()}
-              <AnimatePresence>
-                {image && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-6 overflow-hidden"
-                  >
-                    <section className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                          Ajustes da Imagem
-                        </label>
-                        <span className="text-[10px] font-mono text-zinc-500">
-                          Zoom: {activeZoom}%
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <div className="flex rounded-lg bg-zinc-100 p-1">
-                            <button
-                              onClick={() => setZoom(Math.max(100, zoom - 10))}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
-                            >
-                              <ZoomOut className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => setZoom(Math.min(300, zoom + 10))}
-                              className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-white"
-                            >
-                              <ZoomIn className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <span className="text-[9px] font-bold uppercase text-zinc-400">
-                            Zoom
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1.5">
-                          <button
-                            onClick={() => setIsMirrored(!isMirrored)}
-                            className={`rounded-lg p-2.5 transition-all ${
-                              isMirrored
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                            }`}
-                          >
-                            <FlipHorizontal className="h-4 w-4" />
-                          </button>
-                          <span className="text-[9px] font-bold uppercase text-zinc-400">
-                            Espelhar
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1.5">
-                          <button
-                            onClick={() => setImageRotation((prev) => (prev - 90) % 360)}
-                            className="rounded-lg bg-zinc-100 p-2.5 text-zinc-600 transition-all hover:bg-zinc-200"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </button>
-                          <span className="text-[9px] font-bold uppercase text-zinc-400">
-                            Girar Anti
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1.5">
-                          <button
-                            onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
-                            className="rounded-lg bg-zinc-100 p-2.5 text-zinc-600 transition-all hover:bg-zinc-200"
-                          >
-                            <RotateCw className="h-4 w-4" />
-                          </button>
-                          <span className="text-[9px] font-bold uppercase text-zinc-400">
-                            Girar Hor
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <input
-                          type="range"
-                          min="100"
-                          max="300"
-                          value={activeZoom}
-                          onChange={(e) => setZoom(parseInt(e.target.value))}
-                          className="w-full accent-indigo-600"
-                        />
-                      </div>
-                    </section>
-
-                    <section>
-                      <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                        Ajuste de Posicao
-                      </label>
-                      <div className="flex flex-col items-center gap-1.5">
-                        <button
-                          onClick={() => moveImage('up')}
-                          className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                        >
-                          <ChevronUp className="h-5 w-5" />
-                        </button>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => moveImage('left')}
-                            className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200">
-                            <Move className="h-4 w-4 text-zinc-300" />
-                          </div>
-                          <button
-                            onClick={() => moveImage('right')}
-                            className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => moveImage('down')}
-                          className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                        >
-                          <ChevronDown className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </section>
-
-                    <div className="flex gap-2 pt-4">
-                      <button
-                        onClick={clearImage}
-                        className="ml-auto rounded-xl border border-zinc-200 p-2.5 text-zinc-400 transition-all hover:bg-red-50 hover:text-red-500"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Personalizar Texto
-                  </label>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setTextRotation((prev) => (prev - 45) % 360)}
-                      className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 transition-colors hover:bg-zinc-200"
-                      title="Girar Anti-horario"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setTextRotation((prev) => (prev + 45) % 360)}
-                      className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 transition-colors hover:bg-zinc-200"
-                      title="Girar Horario"
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="textOnly"
-                      checked={textOnlyMode}
-                      onChange={(e) => setTextOnlyMode(e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+            <div className="flex min-h-0 flex-1 flex-col bg-white/40 backdrop-blur-sm">
+              <div className="border-b border-zinc-100/70 px-6 py-3">
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-400">
+                  Etapa {desktopStep}/3
+                </p>
+                <div className="mt-1.5 flex gap-2">
+                  {desktopStepConfig.map((step) => (
+                    <span
+                      key={step.step}
+                      className={`h-2.5 flex-1 rounded-full ${
+                        step.step === desktopStep
+                          ? 'bg-[#435446]'
+                          : step.step < desktopStep
+                            ? 'bg-[#92a18d]'
+                            : 'bg-zinc-300'
+                      }`}
                     />
-                    <label
-                      htmlFor="textOnly"
-                      className="cursor-pointer text-xs font-medium text-zinc-600"
-                    >
-                      Modo Somente Texto (Ocultar Foto)
-                    </label>
-                  </div>
-
-                  <div className="relative">
-                    <Type className="absolute left-3 top-3 h-4 w-4 text-zinc-400" />
-                    <textarea
-                      placeholder="Escreva seu texto..."
-                      value={customText}
-                      onChange={handleCustomTextChange}
-                      maxLength={MAX_CUSTOM_TEXT_LENGTH}
-                      rows={3}
-                      className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsBold(!isBold)}
-                      className={`rounded p-2 ${
-                        isBold ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
-                      }`}
-                    >
-                      <Bold className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsItalic(!isItalic)}
-                      className={`rounded p-2 ${
-                        isItalic ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600'
-                      }`}
-                    >
-                      <Italic className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsUnderline(!isUnderline)}
-                      className={`rounded p-2 ${
-                        isUnderline
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-100 text-zinc-600'
-                      }`}
-                    >
-                      <Underline className="h-4 w-4" />
-                    </button>
-                    <div className="mx-1 h-3 w-px bg-zinc-300" />
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-zinc-800">Espacamento</span>
-                      <button
-                        type="button"
-                        onClick={() => setLetterSpacing((prev) => Math.max(-2, prev - 0.5))}
-                        className="rounded bg-zinc-100 px-3 py-1 text-xs"
-                      >
-                        -
-                      </button>
-                      <span className="w-8 text-center text-xs">{letterSpacing}</span>
-                      <button
-                        type="button"
-                        onClick={() => setLetterSpacing((prev) => Math.min(10, prev + 0.5))}
-                        className="rounded bg-zinc-100 px-3 py-1 text-xs"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-zinc-400">
-                        Fonte
-                      </label>
-                      <select
-                        value={textFont}
-                        onChange={(e) => setTextFont(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {GOOGLE_FONTS.map((font) => (
-                          <option
-                            key={font.name}
-                            value={font.value}
-                            style={{ fontFamily: font.value }}
-                          >
-                            {font.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-zinc-400">
-                        Tamanho
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTextSize((prev) => Math.max(8, prev - 2))}
-                          className="rounded-lg bg-zinc-100 px-3 py-2 text-zinc-700 hover:bg-zinc-200"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          value={textSize}
-                          onChange={(e) =>
-                            setTextSize(Math.max(8, parseInt(e.target.value) || 12))
-                          }
-                          className="no-spinner w-full rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-center text-xs outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setTextSize((prev) => Math.min(200, prev + 2))}
-                          className="rounded-lg bg-zinc-100 px-3 py-2 text-zinc-700 hover:bg-zinc-200"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-zinc-400">
-                      Cor
-                    </label>
-                    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={textColor}
-                          onChange={(e) => setTextColor(e.target.value)}
-                          className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
-                          title="Escolher cor do texto"
-                        />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-zinc-600">Cor do texto</p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <div
-                              className="h-5 w-5 rounded-full border border-zinc-300"
-                              style={{ backgroundColor: textColor }}
-                            />
-                            <input
-                              type="text"
-                              value={textColor}
-                              onChange={(e) => setTextColor(e.target.value)}
-                              className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={textStrokeColor}
-                          onChange={(e) => setTextStrokeColor(e.target.value)}
-                          className="h-12 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-1"
-                          title="Cor da borda"
-                        />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-zinc-600">
-                            Cor e espessura da borda
-                          </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="0"
-                              max="8"
-                              value={textStroke}
-                              onChange={(e) => setTextStroke(parseInt(e.target.value))}
-                              className="w-full"
-                            />
-                            <span className="w-8 text-center text-xs text-zinc-600">
-                              {textStroke}px
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </section>
-            </div>
+                <h3 className="mt-1 text-base font-bold text-zinc-900">
+                  {desktopStepConfig[desktopStep - 1].title}
+                </h3>
+                <p className="mt-0 text-xs text-zinc-500">
+                  {desktopStepConfig[desktopStep - 1].description}
+                </p>
+              </div>
 
-            <div className="mt-auto space-y-4 border-t border-zinc-100 bg-zinc-50/50 p-6">
-              {renderOrderSummary()}
-              <button
-                type="button"
-                onClick={adicionarItemAoCarrinho}
-                disabled={isUploadingOrder || !canSubmitCurrentItem}
-                className="w-full rounded-xl border border-[#6d7b6b]/15 bg-[#e4ebe1] px-6 py-4 font-bold text-[#435446] transition-all disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Adicionar ao carrinho e fazer outra
-                </span>
-              </button>
-              <label className="flex items-start gap-3 rounded-xl border border-[#6d7b6b]/15 bg-white px-4 py-4 text-left shadow-sm">
-                <input
-                  type="checkbox"
-                  checked={isArtworkApproved}
-                  onChange={(e) => setIsArtworkApproved(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#435446] focus:ring-[#435446]"
-                />
-                <span>
-                  <span className="block text-sm font-semibold text-zinc-800">
-                    Arte aprovada pelo cliente
-                  </span>
-                  <span className="mt-1 block text-xs text-zinc-500">
-                    A finalizacao do pedido so fica disponivel apos esta confirmacao.
-                  </span>
-                </span>
-              </label>
-              <button
-                onClick={handleFinish}
-                disabled={isUploadingOrder || !isArtworkApproved || (!carrinho.length && !canFinish)}
-                className={`w-full rounded-xl px-6 py-4 font-bold transition-all ${
-                  (carrinho.length || canFinish) && isArtworkApproved
-                    ? 'scale-[1.02] bg-zinc-900 text-white shadow-xl active:scale-100 hover:bg-zinc-800'
-                    : 'cursor-not-allowed bg-zinc-200 text-zinc-400'
-                }`}
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <Download className="h-5 w-5" />
-                  {isUploadingOrder ? 'Enviando imagens...' : 'Finalizar Pedido'}
-                </span>
-              </button>
-              {orderCompleted && (
-                <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-700">
-                  Pedido pronto para envio no WhatsApp!
-                </div>
-              )}
+              <div className="min-h-0 flex-1 overflow-hidden px-6 py-3">
+                {renderDesktopSidebarContent()}
+              </div>
+
+              {renderDesktopStepFooter()}
             </div>
           </aside>
 
@@ -4032,7 +3931,14 @@ ${previewImageUrl}
                 backgroundSize: '32px 32px',
               }}
             />
-            {renderPhonePreview()}
+            <div className="relative z-10 flex w-full max-w-[1180px] items-center justify-center">
+              {desktopStep === 1 && image && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                  {renderDesktopImageControlsPanel()}
+                </div>
+              )}
+              {renderPhonePreview()}
+            </div>
           </main>
         </div>
       )}
